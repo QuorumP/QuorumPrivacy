@@ -1,0 +1,1261 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>QUORUM — Confidential Governance Infrastructure on Solana</title>
+    <base target="_top" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:ital,wght@0,200;0,400;1,400;0,500&display=swap" rel="stylesheet">
+    <style>
+      ::-webkit-scrollbar { display: none; }
+      html {
+        font-size: clamp(12px, 0.833333vw, 18px);
+      }
+      body {
+        margin: 0;
+        overflow-x: hidden;
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+        background-color: #0a0b1f; /* deep indigo / near-black navy */
+        color: #ece8d8;
+        height: 2800vh;
+      }
+      .preload-hidden { opacity: 0 !important; pointer-events: none !important; }
+      .reveal-anim {
+        transition: transform 1.6s cubic-bezier(0.2, 0.8, 0.2, 1) 0.6s, opacity 1.6s ease 0.6s;
+        will-change: transform, opacity;
+      }
+      .preload-hidden.reveal-anim.from-top { transform: translateY(-20px); }
+      .preload-hidden.reveal-anim.from-bottom { transform: translateY(20px); }
+      canvas { display: block; }
+      .qrm-robot-canvas { display: block; }
+      @media (max-width: 900px) {
+        .qrm-robot-canvas { display: none !important; }
+      }
+
+
+      /* Wordmark */
+      .hero-logo {
+        position: fixed;
+        top: 2.5rem;
+        left: 3.125rem;
+        z-index: 90;
+        font-family: 'Sarabun', sans-serif;
+        font-weight: 500;
+        font-size: 1.25rem;
+        letter-spacing: 0.35em;
+        color: #ece8d8;
+        text-decoration: none;
+      }
+      .hero-logo .dot { color: #d4af4f; }
+
+      .hero-title {
+        position: absolute;
+        top: 43%;
+        transform: translateY(-50%);
+        left: 3.125rem;
+        font-family: 'Sarabun', sans-serif;
+        font-weight: 200;
+        font-size: max(2.5rem, 7vw);
+        color: #ece8d8;
+        margin: 0;
+        z-index: 2;
+        pointer-events: none;
+        line-height: 1.0;
+        white-space: nowrap;
+        letter-spacing: -0.01em;
+      }
+      .char-mask {
+        display: inline-block;
+        overflow: hidden;
+        vertical-align: bottom;
+        padding-top: 0.2em;
+        margin-top: -0.2em;
+        padding-bottom: 1.2em;
+        margin-bottom: -1.2em;
+        perspective: 500px;
+      }
+      .hero-char {
+        display: inline-block;
+        transform: translateY(110%) translateZ(-60px) rotateX(-65deg);
+        transform-origin: bottom center;
+        filter: blur(14px);
+        opacity: 0;
+        will-change: transform, filter, opacity;
+        transition: transform 1.6s cubic-bezier(0.2, 0.8, 0.2, 1), filter 1.6s ease, opacity 1.2s ease;
+      }
+      .hero-char.revealed {
+        transform: translateY(0) translateZ(0) rotateX(0deg);
+        filter: blur(0px);
+        opacity: 1;
+      }
+      .animated-title .hero-char {
+        transition: transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1), filter 0.8s ease, opacity 0.6s ease;
+      }
+      .hero-nav {
+        position: fixed;
+        top: 2.5rem;
+        right: 3.125rem;
+        z-index: 90;
+        font-family: 'Sarabun', sans-serif;
+        font-weight: 400;
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        gap: 2rem;
+        pointer-events: auto;
+      }
+      .hero-nav a {
+        color: #ece8d8;
+        text-decoration: none;
+        font-size: 0.95rem;
+        font-weight: 400;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        opacity: 0.85;
+        transition: opacity 0.2s ease, color 0.2s ease;
+        cursor: pointer;
+        pointer-events: auto;
+        position: relative;
+        z-index: 91;
+      }
+      .hero-nav a:hover { opacity: 1; color: #d4af4f; }
+      .hero-logo { pointer-events: auto; }
+
+      .hero-hamburger {
+        display: none;
+        width: 2.5rem; height: 2.5rem;
+        align-items: center; justify-content: center;
+        background: rgba(10,11,31,0.6);
+        border: 1px solid rgba(212,175,79,0.3);
+        border-radius: 999px;
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        cursor: pointer;
+        pointer-events: auto;
+          position: fixed;
+        top: 1.25rem; right: 1.25rem;
+          z-index: 100;
+      }
+      .hero-hamburger span {
+        display: block; width: 1.1rem; height: 1.5px;
+        background: #ece8d8; position: relative;
+        transition: transform 0.3s ease, opacity 0.2s ease;
+      }
+      .hero-hamburger span::before,
+      .hero-hamburger span::after {
+        content: ''; position: absolute; left: 0;
+        width: 100%; height: 1.5px; background: #ece8d8;
+        transition: transform 0.3s ease, top 0.3s ease;
+      }
+      .hero-hamburger span::before { top: -0.4rem; }
+      .hero-hamburger span::after { top: 0.4rem; }
+      .hero-hamburger.open span { background: transparent; }
+      .hero-hamburger.open span::before { top: 0; transform: rotate(45deg); }
+      .hero-hamburger.open span::after { top: 0; transform: rotate(-45deg); }
+
+      .hero-subtitle { font-weight: 400; color: #ece8d8; }
+
+      .hero-info-block {
+        position: absolute;
+        bottom: 3.125rem;
+        left: 3.125rem;
+        z-index: 5;
+        font-family: 'Sarabun', sans-serif;
+        color: #ece8d8;
+        width: 22rem;
+        display: flex;
+        flex-direction: column;
+      }
+      .hi-top {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.95rem;
+        font-weight: 400;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        margin-bottom: 2rem;
+        opacity: 0.7;
+      }
+      .hi-ca {
+        display: flex;
+        align-items: center;
+        gap: 0.55rem;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.16em;
+        margin-bottom: 0.9rem;
+        opacity: 0.85;
+      }
+      .hi-ca-value {
+        color: #d4af4f;
+        cursor: pointer;
+        border: 1px solid rgba(212, 175, 79, 0.35);
+        border-radius: 0.5rem;
+        padding: 0.12rem 0.6rem;
+        user-select: none;
+        transition: background 0.2s, color 0.2s;
+      }
+      .hi-ca-value:hover { background: rgba(212, 175, 79, 0.12); color: #ece8d8; }
+      .hi-text {
+        font-size: 1.0625rem;
+        line-height: 1.55;
+        opacity: 0.75;
+        margin-bottom: 2.5rem;
+      }
+      .hi-btn {
+        align-self: flex-start;
+        padding: 0.875rem 2.5rem;
+        border: 1px solid rgba(212, 175, 79, 0.6);
+        border-radius: 2.5rem;
+        background: rgba(255, 255, 255, 0.04);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        color: #d4af4f;
+        text-decoration: none;
+        font-size: 0.85rem;
+        font-weight: 400;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        transition: background 0.2s, transform 0.2s, color 0.2s;
+        pointer-events: auto;
+        cursor: pointer;
+        position: relative;
+        z-index: 20;
+      }
+      .hi-btn:hover {
+        background: rgba(212, 175, 79, 0.12);
+        transform: translateY(-2px);
+        color: #ece8d8;
+      }
+      .scroll-content-wrapper {
+        position: absolute;
+        top: calc(100vh + 34.375rem);
+        left: 0;
+        width: 100%;
+        z-index: 2;
+        display: flex;
+        flex-direction: column;
+      }
+      .scroll-title-container {
+        padding-left: 3.125rem;
+        margin-bottom: 37.5rem;
+      }
+      .scroll-title-container h3 {
+        font-family: 'Sarabun', sans-serif;
+        font-weight: 200;
+        font-size: max(2.625rem, 5.5vw);
+        letter-spacing: -0.02em;
+        white-space: nowrap;
+        color: #ece8d8;
+        margin: 0;
+        line-height: 1.1;
+      }
+      .scroll-support {
+        padding-left: 3.125rem;
+        margin-top: -33rem;
+        margin-bottom: 33rem;
+        max-width: 32rem;
+        font-family: 'Sarabun', sans-serif;
+        font-size: 1.05rem;
+        line-height: 1.5;
+        opacity: 0.7;
+        color: #ece8d8;
+      }
+
+      .clients-container {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        margin-bottom: 37.5rem;
+      }
+      .clients-subtitle {
+        font-family: 'Sarabun', sans-serif;
+        font-size: 0.95rem;
+        font-weight: 400;
+        text-transform: uppercase;
+        letter-spacing: 0.18em;
+        padding-left: 3.125rem;
+        margin-bottom: 1rem;
+        color: #ece8d8;
+        opacity: 0.65;
+      }
+      .clients-line {
+        height: 1px;
+        margin-left: 3.125rem;
+        margin-right: 3.125rem;
+        background: linear-gradient(to right, rgba(212,175,79,0), #d4af4f 30%, #8a7bd8 70%, rgba(138,123,216,0));
+        margin-bottom: 3rem;
+      }
+      .marquee-container {
+        width: 100%;
+        overflow: hidden;
+        white-space: nowrap;
+      }
+      .marquee-content {
+        display: inline-flex;
+        align-items: center;
+        gap: 1.5rem;
+        padding-right: 1.5rem;
+        animation: marquee 45s linear infinite;
+      }
+      @keyframes marquee {
+        0% { transform: translateX(-50%); }
+        100% { transform: translateX(0); }
+      }
+      .marquee-pill {
+        display: inline-flex;
+        align-items: center;
+        height: 3.25rem;
+        padding: 0 1.75rem;
+        border: 1px solid rgba(236, 232, 216, 0.18);
+        border-radius: 999px;
+        font-family: 'Sarabun', sans-serif;
+        font-size: 0.95rem;
+        font-weight: 400;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: #ece8d8;
+        background: rgba(255,255,255,0.02);
+        white-space: nowrap;
+      }
+      .marquee-pill .dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #d4af4f;
+        margin-right: 0.75rem;
+        box-shadow: 0 0 8px rgba(212,175,79,0.6);
+      }
+
+      .feature-container { width: 100%; display: flex; flex-direction: column; }
+      .feature-title {
+        font-family: 'Sarabun', sans-serif;
+        font-weight: 200;
+        font-size: max(2.625rem, 5.5vw);
+        letter-spacing: -0.02em;
+        white-space: nowrap;
+        color: #ece8d8;
+        margin: 0;
+        line-height: 1.1;
+      }
+      .feature-support {
+        font-family: 'Sarabun', sans-serif;
+        font-size: 1.05rem;
+        line-height: 1.5;
+        opacity: 0.7;
+        color: #ece8d8;
+        max-width: 28rem;
+        margin-top: 2rem;
+      }
+      .split-feature-container {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        padding-left: 3.125rem;
+        padding-right: 3.125rem;
+        box-sizing: border-box;
+        margin-top: 37.5rem;
+      }
+      .split-bottom {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        max-width: 45rem;
+      }
+      .feature-text {
+        font-family: 'Sarabun', sans-serif;
+        font-size: max(1.1rem, 1.25vw);
+        line-height: 1.5;
+        font-weight: 300;
+        color: #ece8d8;
+        opacity: 0.8;
+      }
+      .phase4-container {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100vh;
+        z-index: 5; pointer-events: none;
+        display: flex; align-items: flex-end; justify-content: flex-end;
+        opacity: 0; transform: translateY(50px);
+      }
+      .phase4-container .split-feature-container {
+        pointer-events: auto;
+        margin-top: 0;
+        padding-top: 4rem;
+        padding-bottom: 4rem;
+        height: 100vh;
+        justify-content: space-between;
+        width: auto;
+        align-items: flex-start;
+      }
+      .phase5-container {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100vh;
+        z-index: 4; pointer-events: none; opacity: 0;
+      }
+      .phase5-title-left { position: absolute; top: 2.5rem; left: 3.125rem; text-align: left; margin: 0; }
+      .phase5-title-right { position: absolute; bottom: 2.5rem; right: 3.125rem; text-align: right; margin: 0; }
+      .phase5-desc-left { position: absolute; bottom: 2.5rem; left: 3.125rem; text-align: left; max-width: 28rem; margin: 0; }
+      .phase5-label-right { position: absolute; top: 2.5rem; right: 3.125rem; width: 14rem; margin: 0; }
+      .phase6-container {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100vh;
+        z-index: 2; pointer-events: none; opacity: 0;
+        display: flex; align-items: center; justify-content: center;
+      }
+      .phase6-title {
+        position: absolute; top: 30vh; transform: translateY(-50%);
+        left: 0; width: 100%;
+        font-family: 'Sarabun', sans-serif; font-weight: 200;
+        font-size: max(2.5rem, 7vw);
+        color: #ece8d8; margin: 0; line-height: 1.0;
+        text-align: center; white-space: nowrap; pointer-events: none;
+        letter-spacing: -0.01em;
+      }
+      .phase6-subline {
+        position: absolute;
+        top: calc(30vh + 7vw);
+        left: 0; width: 100%;
+        text-align: center;
+        font-family: 'Sarabun', sans-serif;
+        font-size: 1.1rem;
+        opacity: 0.6;
+        color: #ece8d8;
+        margin-top: 2rem;
+      }
+      .phase6-footer-wrapper {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100vh;
+        z-index: 80; pointer-events: none; transform: translateY(100vh);
+      }
+      .phase6-footer-wrapper * { pointer-events: auto; }
+      .glass-footer {
+        position: absolute;
+        bottom: 2.5rem; left: 3.125rem; right: 3.125rem;
+        padding: 3rem 3.5rem;
+        background: rgba(20, 22, 50, 0.55);
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
+        border-radius: 2rem;
+        border: 1px solid rgba(212, 175, 79, 0.25);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+        display: flex; flex-direction: column;
+        color: #ece8d8;
+        font-family: 'Sarabun', sans-serif;
+      }
+      .footer-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 4rem; }
+      .footer-left { width: 32%; display: flex; flex-direction: column; }
+      .footer-brand {
+        font-size: 1.5rem; font-weight: 500;
+        letter-spacing: 0.38em; margin: 0 0 1.25rem 0;
+        color: #ece8d8;
+      }
+      .footer-brand .dot { color: #d4af4f; }
+      .footer-tagline {
+        font-size: 0.95rem; line-height: 1.55;
+        color: #ece8d8; opacity: 0.7; max-width: 22rem;
+        margin-bottom: 2rem; font-weight: 300;
+      }
+      .footer-socials { display: flex; gap: 0.75rem; }
+      .footer-social {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 2.5rem; height: 2.5rem; border-radius: 999px;
+        border: 1px solid rgba(212,175,79,0.4);
+        background: rgba(255,255,255,0.04);
+        color: #ece8d8; text-decoration: none; cursor: pointer;
+        font-family: inherit;
+        transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+      }
+      .footer-social:hover {
+        background: rgba(212,175,79,0.12);
+        border-color: rgba(212,175,79,0.7);
+        color: #d4af4f; transform: translateY(-2px);
+      }
+      .footer-right { display: flex; gap: 3.5rem; padding-right: 0.5rem; }
+      .footer-col { display: flex; flex-direction: column; gap: 0.85rem; min-width: 9rem; }
+      .footer-col-title {
+        font-size: 0.72rem; font-weight: 500; margin-bottom: 0.85rem;
+        letter-spacing: 0.22em; text-transform: uppercase; color: #d4af4f;
+      }
+      .footer-col a {
+        color: #ece8d8; opacity: 0.65; text-decoration: none;
+        font-size: 0.88rem; font-weight: 300;
+        transition: color 0.15s ease, opacity 0.15s ease;
+      }
+      .footer-col a:hover { opacity: 1; color: #d4af4f; }
+      .footer-line { height: 1px; background: rgba(236,232,216,0.1); margin-top: 2.5rem; margin-bottom: 1.25rem; }
+      .footer-bottom {
+        display: flex; justify-content: space-between; align-items: center;
+        font-size: 0.78rem; opacity: 0.55; letter-spacing: 0.04em;
+      }
+      .footer-bottom .built { color: #d4af4f; opacity: 0.8; letter-spacing: 0.16em; text-transform: uppercase; font-size: 0.72rem; }
+
+      .words-container {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100vh;
+        perspective: 1500px; z-index: 2; pointer-events: none;
+      }
+      .flying-word {
+        position: absolute; top: 50%; left: 50%;
+        font-family: 'Sarabun', sans-serif; font-weight: 400;
+        font-size: max(80px, 25vw);
+        color: #ece8d8;
+        margin: 0; padding: 0 0.2em;
+        opacity: 0; white-space: nowrap;
+        transform: translate3d(-50%, -50%, 0) rotateY(0deg);
+        letter-spacing: -0.02em;
+      }
+      .flying-word .char { display: inline-block; padding: 0 0.15em; margin: 0 -0.15em; }
+
+      .glass-container {
+        position: fixed; bottom: 0; left: 0; width: 100%; height: 100vh;
+        background: rgba(20, 22, 50, 0.45);
+        backdrop-filter: blur(30px);
+        -webkit-backdrop-filter: blur(30px);
+        border-top: 1px solid rgba(212, 175, 79, 0.25);
+        z-index: 10;
+        transform: translateY(100vh);
+        pointer-events: none;
+      }
+      .glass-gradient-wrapper {
+        position: absolute; top: 50%; left: 50%;
+        width: calc(100% - 8rem); height: calc(100% - 8rem);
+        transform: translate(-50%, -50%) scale(0.65);
+        border-radius: 0px; overflow: hidden; pointer-events: auto;
+      }
+      .glass-gradient-img {
+        position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+        object-fit: cover; z-index: 1; opacity: 0.35;
+        filter: hue-rotate(200deg) saturate(0.7) brightness(0.7);
+      }
+      .gradient-content {
+        position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+        z-index: 2; padding: 2rem; box-sizing: border-box;
+        display: flex; flex-direction: column; justify-content: space-between;
+        color: #ece8d8;
+        font-family: 'Sarabun', sans-serif;
+      }
+      .gc-top-left {
+        font-size: max(2.625rem, 5.5vw); font-weight: 200;
+        line-height: 1.1; letter-spacing: -0.02em;
+        color: #ece8d8; max-width: none; white-space: nowrap;
+      }
+      .gc-bottom { display: flex; justify-content: space-between; align-items: flex-end; }
+      .gc-bottom-left {
+        font-size: 0.85rem; font-weight: 400; opacity: 0.7;
+        text-transform: uppercase; letter-spacing: 0.18em;
+      }
+      .gc-bottom-right { display: flex; gap: 3.75rem; align-items: flex-end; }
+      .stat-col {
+        position: relative; padding-left: 20px;
+        display: flex; flex-direction: column; gap: 16px;
+        max-width: 16rem;
+      }
+      .stat-col-tall { margin-bottom: 120px; }
+      .stat-col::before {
+        content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 1px;
+        background: linear-gradient(to bottom, rgba(212,175,79,0.0), rgba(212,175,79,0.4) 10%, rgba(212,175,79,0.4) 90%, rgba(212,175,79,0.0));
+      }
+      .stat-col-tall::before { bottom: -120px; }
+      .stat-num {
+        font-size: max(42px, 5.5vw); font-weight: 200; line-height: 1;
+        color: #d4af4f;
+      }
+      .stat-label {
+        font-size: 0.95rem; font-weight: 500; opacity: 0.95;
+        text-transform: uppercase; letter-spacing: 0.12em;
+      }
+      .stat-desc { font-size: 0.85rem; line-height: 1.5; opacity: 0.7; }
+
+      /* ────────── Responsive ────────── */
+      @media (max-width: 900px) {
+        html { font-size: max(11px, 2.6vw); }
+        body { height: 2400vh; }
+        .hero-logo { top: 1.25rem; left: 1.25rem; font-size: 1rem; letter-spacing: 0.28em; }
+        .hero-hamburger { display: inline-flex; }
+        .hero-nav {
+          top: 4.5rem; right: 1rem; left: auto; bottom: auto;
+          flex-direction: column; align-items: stretch;
+          gap: 0.25rem; padding: 1rem 1.25rem;
+          border-radius: 1.25rem;
+          background: rgba(10,11,31,0.85);
+          backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+          border: 1px solid rgba(212,175,79,0.22);
+          min-width: 13rem;
+          max-height: 0; overflow: hidden; padding-top: 0; padding-bottom: 0;
+          opacity: 0; pointer-events: none;
+          transition: max-height 0.35s ease, opacity 0.25s ease, padding 0.25s ease;
+        }
+        .hero-nav.open {
+          max-height: 30rem; opacity: 1; pointer-events: auto;
+          padding-top: 1rem; padding-bottom: 1rem;
+        }
+        .hero-nav a { font-size: 0.78rem; letter-spacing: 0.16em; padding: 0.6rem 0.25rem; }
+        .hero-title { left: 1.25rem; right: 1.25rem; font-size: max(2rem, 11vw); white-space: normal; line-height: 1.05; top: 38%; }
+        .hero-info-block { left: 1.25rem; right: 1.25rem; bottom: 2.5rem; width: auto; }
+        .hi-text { font-size: 0.95rem; margin-bottom: 1.5rem; }
+        .scroll-title-container, .scroll-support, .clients-subtitle { padding-left: 1.25rem; padding-right: 1.25rem; }
+        .scroll-title-container h3, .feature-title { white-space: normal; font-size: max(2rem, 8vw); }
+        .clients-line { margin-left: 1.25rem; margin-right: 1.25rem; }
+        .split-feature-container { padding-left: 1.25rem; padding-right: 1.25rem; }
+        .glass-footer { left: 1rem; right: 1rem; bottom: 1rem; padding: 1.75rem; border-radius: 1.5rem; }
+        .footer-top { flex-direction: column; gap: 2.25rem; }
+        .footer-left { width: 100%; }
+        .footer-right { display: grid; grid-template-columns: 1fr 1fr; gap: 1.75rem; padding-right: 0; }
+        .footer-col { gap: 0.6rem; min-width: 0; }
+        .footer-bottom { flex-direction: column; gap: 0.5rem; text-align: center; }
+        .gc-top-left { white-space: normal; font-size: max(1.75rem, 7vw); }
+        .gc-bottom { flex-direction: column; align-items: flex-start; gap: 1.5rem; }
+        .gc-bottom-right { flex-direction: column; gap: 1.5rem; align-items: flex-start; }
+        .glass-gradient-wrapper { width: calc(100% - 1.5rem); height: calc(100% - 1.5rem); }
+        .phase6-title { font-size: max(2rem, 9vw); white-space: normal; padding: 0 1rem; }
+        .phase5-title-left { position: absolute; top: 2.5rem; left: 1.25rem; right: 1.25rem; white-space: normal; font-size: max(1.85rem, 7.5vw); }
+        .phase5-label-right { position: absolute; top: auto; bottom: calc(50vh + 0.5rem); left: 1.25rem; right: 1.25rem; width: auto; max-width: none; display: flex; justify-content: space-between; font-size: 0.7rem; }
+        .phase5-desc-left { position: absolute; top: 50vh; bottom: auto; left: 1.25rem; right: 1.25rem; max-width: none; font-size: 0.95rem; line-height: 1.5; }
+        .phase5-title-right { position: absolute; top: auto; bottom: 2.5rem; left: 1.25rem; right: 1.25rem; text-align: left; white-space: normal; font-size: max(1.85rem, 7.5vw); }
+        .flying-word { font-size: max(64px, 18vw); }
+      }
+      @media (max-width: 520px) {
+        .hero-nav a { font-size: 0.65rem; }
+        .footer-right { gap: 1.25rem; }
+      }
+
+      /* ─────────── New spec sections ─────────── */
+      .qrm-section {
+        padding: 0 3.125rem;
+        margin-bottom: 37.5rem;
+        font-family: 'Sarabun', sans-serif;
+        color: #ece8d8;
+      }
+      .qrm-section .kicker {
+        font-size: 0.78rem; letter-spacing: 0.22em; text-transform: uppercase;
+        color: #d4af4f; opacity: 0.85; margin-bottom: 1.25rem;
+      }
+      .qrm-section .qrm-sub {
+        font-size: 1.05rem; line-height: 1.55; opacity: 0.7; max-width: 36rem;
+        margin-top: 2rem; font-weight: 300;
+      }
+
+      /* Four corruptions */
+      .qrm-corruptions { display: flex; flex-direction: column; gap: 2rem; margin-top: 2.5rem; }
+      .qrm-corr-row {
+        display: flex; justify-content: space-between; align-items: baseline;
+        gap: 2rem; padding-bottom: 1.5rem;
+        border-bottom: 1px solid rgba(236,232,216,0.08);
+      }
+      .qrm-corr-row .l {
+        font-size: max(1.6rem, 2.8vw); font-weight: 200;
+        letter-spacing: -0.01em; opacity: 0.9;
+      }
+      .qrm-corr-row .r {
+        font-size: 0.82rem; letter-spacing: 0.18em; text-transform: uppercase;
+        color: #d4af4f; text-align: right; max-width: 18rem;
+      }
+
+      /* Four modules tiles */
+      .qrm-tiles {
+        display: grid; grid-template-columns: repeat(2, 1fr);
+        gap: 1.25rem; margin-top: 2.5rem;
+      }
+      .qrm-tile {
+        position: relative; padding: 2rem 2.25rem;
+        background: rgba(20,22,50,0.55);
+        backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+        border: 1px solid rgba(212,175,79,0.25);
+        border-radius: 1.5rem;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.35);
+        overflow: hidden;
+      }
+      .qrm-tile::before {
+        content: ''; position: absolute; top: 0; left: 0; height: 1px; width: 60%;
+        background: linear-gradient(to right, rgba(212,175,79,0.7), transparent);
+      }
+      .qrm-tile .num {
+        font-size: 0.78rem; letter-spacing: 0.22em; color: #d4af4f;
+        text-transform: uppercase; margin-bottom: 0.85rem;
+      }
+      .qrm-tile .name {
+        font-size: 1.45rem; font-weight: 400; letter-spacing: -0.01em;
+        margin: 0 0 0.75rem 0; line-height: 1.2;
+      }
+      .qrm-tile .desc { font-size: 0.92rem; line-height: 1.55; opacity: 0.7; }
+
+      /* Sealed-ballot 6 steps */
+      .qrm-steps {
+        display: grid; grid-template-columns: repeat(3, 1fr);
+        gap: 1.25rem; margin-top: 2.5rem;
+      }
+      .qrm-step {
+        padding: 1.5rem 1.5rem; border-radius: 1.25rem;
+        background: rgba(255,255,255,0.025);
+        border: 1px solid rgba(236,232,216,0.08);
+      }
+      .qrm-step .n {
+        font-family: 'Sarabun', sans-serif; font-weight: 200;
+        font-size: 2.5rem; line-height: 1; color: #d4af4f; margin-bottom: 0.5rem;
+      }
+      .qrm-step .t {
+        font-size: 0.78rem; letter-spacing: 0.18em; text-transform: uppercase;
+        margin-bottom: 0.4rem; color: #ece8d8;
+      }
+      .qrm-step .d { font-size: 0.85rem; line-height: 1.5; opacity: 0.65; }
+
+      /* Roles */
+      .qrm-roles { display: flex; flex-direction: column; gap: 0.75rem; margin-top: 2.5rem; }
+      .qrm-role {
+        display: grid; grid-template-columns: 12rem 1fr auto;
+        gap: 1.5rem; align-items: center;
+        padding: 1.1rem 1.5rem; border-radius: 1rem;
+        background: rgba(20,22,50,0.4);
+        border: 1px solid rgba(236,232,216,0.06);
+      }
+      .qrm-role .who {
+        font-size: 0.82rem; letter-spacing: 0.18em; text-transform: uppercase;
+        color: #d4af4f;
+      }
+      .qrm-role .what { font-size: 0.95rem; opacity: 0.85; }
+      .qrm-role .earn {
+        font-size: 0.75rem; letter-spacing: 0.14em; text-transform: uppercase;
+        padding: 0.4rem 0.85rem; border-radius: 999px;
+        border: 1px solid rgba(212,175,79,0.4);
+        color: #d4af4f; background: rgba(212,175,79,0.06);
+        white-space: nowrap;
+      }
+
+      /* QRM token chips */
+      .qrm-utils {
+        display: grid; grid-template-columns: repeat(3, 1fr);
+        gap: 0.85rem; margin-top: 2.5rem;
+      }
+      .qrm-util {
+        padding: 1.25rem 1.25rem; border-radius: 1rem;
+        border: 1px solid rgba(236,232,216,0.08);
+        background: rgba(255,255,255,0.025);
+      }
+      .qrm-util .lbl {
+        font-size: 0.72rem; letter-spacing: 0.18em; text-transform: uppercase;
+        color: #d4af4f; margin-bottom: 0.55rem;
+      }
+      .qrm-util .val { font-size: 0.92rem; opacity: 0.85; line-height: 1.45; }
+
+      /* Comparison table */
+      .qrm-table-wrap { margin-top: 2.5rem; overflow-x: auto; }
+      .qrm-table {
+        width: 100%; border-collapse: collapse;
+        font-family: 'Sarabun', sans-serif; font-size: 0.92rem; min-width: 38rem;
+      }
+      .qrm-table th, .qrm-table td {
+        text-align: left; padding: 0.95rem 1rem;
+        border-bottom: 1px solid rgba(236,232,216,0.07);
+      }
+      .qrm-table th {
+        font-weight: 400; font-size: 0.72rem; letter-spacing: 0.18em;
+        text-transform: uppercase; opacity: 0.6;
+      }
+      .qrm-table th.q-col, .qrm-table td.q-col {
+        color: #d4af4f; border-left: 1px solid rgba(212,175,79,0.25);
+        border-right: 1px solid rgba(212,175,79,0.25);
+        background: rgba(212,175,79,0.04);
+      }
+      .qrm-table td.row-l { opacity: 0.85; }
+      .qrm-table .x { opacity: 0.4; }
+
+      /* Roadmap rail */
+      .qrm-roadmap {
+        margin-top: 2.5rem;
+        display: grid; grid-template-columns: repeat(5, 1fr);
+        gap: 1rem;
+      }
+      .qrm-phase {
+        padding: 1.5rem 1.25rem;
+        border-top: 1px solid rgba(212,175,79,0.35);
+        background: linear-gradient(180deg, rgba(212,175,79,0.05), transparent 60%);
+      }
+      .qrm-phase .ph { font-size: 0.72rem; letter-spacing: 0.22em; text-transform: uppercase; color: #d4af4f; }
+      .qrm-phase .weeks { font-size: 2rem; font-weight: 200; margin: 0.6rem 0; line-height: 1; }
+      .qrm-phase .focus { font-size: 0.85rem; opacity: 0.85; margin-bottom: 0.5rem; }
+      .qrm-phase .ms { font-size: 0.78rem; line-height: 1.5; opacity: 0.6; font-weight: 200; }
+
+      /* Trust strip */
+      .qrm-trust {
+        margin-top: 2.5rem;
+        display: grid; grid-template-columns: repeat(3, 1fr);
+        gap: 0; border-top: 1px solid rgba(212,175,79,0.25);
+        border-bottom: 1px solid rgba(212,175,79,0.25);
+      }
+      .qrm-trust .cell {
+        padding: 2rem 1.5rem;
+        border-right: 1px solid rgba(236,232,216,0.06);
+      }
+      .qrm-trust .cell:last-child { border-right: none; }
+      .qrm-trust .num {
+        font-family: 'Sarabun', sans-serif; font-weight: 200;
+        font-size: max(2.5rem, 4.5vw); color: #d4af4f; line-height: 1;
+        letter-spacing: -0.02em;
+      }
+      .qrm-trust .num .zero { color: #ece8d8; }
+      .qrm-trust .lbl {
+        margin-top: 0.85rem; font-size: 0.78rem; letter-spacing: 0.18em;
+        text-transform: uppercase; opacity: 0.7;
+      }
+
+      @media (max-width: 900px) {
+        .qrm-section { padding: 0 1.25rem; margin-bottom: 14rem; }
+        .qrm-tiles, .qrm-steps, .qrm-utils, .qrm-roadmap, .qrm-trust { grid-template-columns: 1fr; }
+        .qrm-trust .cell { border-right: none; border-bottom: 1px solid rgba(236,232,216,0.06); }
+        .qrm-trust .cell:last-child { border-bottom: none; }
+        .qrm-role { grid-template-columns: 1fr; gap: 0.5rem; }
+        .qrm-corr-row { flex-direction: column; gap: 0.5rem; align-items: flex-start; }
+        .qrm-corr-row .r { text-align: left; max-width: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- PRELOADER ODOMETER -->
+    <div id="preloader" style="position: fixed; top: 0; left: 0; width: 100%; height: 100vh; z-index: 9999; pointer-events: none; transition: opacity 1s ease; background: #0a0b1f;">
+      <div style="position: absolute; top: 2.5rem; left: 3.125rem; color: #ece8d8; font-family: 'Sarabun', sans-serif; font-weight: 200; font-size: 4rem; letter-spacing: -0.02em; line-height: 1;">
+        [ &nbsp;
+        <div style="height: 4rem; overflow: hidden; position: relative; width: 6.5rem; display: inline-block; vertical-align: top;">
+          <div id="odometer-numbers" style="position: absolute; top: 0; left: 0; width: 100%; transition: transform 0.05s linear; text-align: center;">
+            <!-- JS will inject numbers 0 to 100 here -->
+          </div>
+        </div>
+        &nbsp; / 100 ]
+      </div>
+    </div>
+
+    <a href="/" target="_parent" class="hero-logo preload-hidden reveal-anim from-top" aria-label="QUORUM">QUORU<span class="dot">M</span></a>
+    <h1 class="hero-title" id="animated-hero-title">The Secret Ballot,<br><span class="hero-subtitle">Brought On-Chain</span></h1>
+
+    <button class="hero-hamburger preload-hidden" id="hero-hamburger" aria-label="Toggle navigation" aria-expanded="false">
+      <span></span>
+    </button>
+
+    <nav class="hero-nav preload-hidden reveal-anim from-top" id="hero-nav">
+      <a href="/" target="_parent">Home</a>
+      <a href="#modules">Protocol</a>
+      <a href="#how">How it works</a>
+      <a href="#roles">Network</a>
+      <a href="#roadmap">Roadmap</a>
+      <a href="/docs" target="_parent">Docs</a>
+      <a href="/dashboard" target="_parent">Dashboard</a>
+    </nav>
+
+    <div class="hero-info-block preload-hidden reveal-anim from-bottom">
+      <div class="hi-ca">CA :<span class="hi-ca-value" data-ca="TBA" role="button" tabindex="0" title="Copy contract address" onclick="var v=this.getAttribute('data-ca');if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(v);}var s=this;s.textContent='COPIED';setTimeout(function(){s.textContent=v;},1200);">TBA</span></div>
+      <div class="hi-top">
+        <span>( QRM )</span>
+        <span>[ 001 / 004 ]</span>
+      </div>
+      <div style="font-size: 1.0625rem; line-height: 1.55; margin-bottom: 1.25rem; color: #ece8d8; font-weight: 400;">
+        Sealed votes. Provable tally. Confidential treasury.
+      </div>
+      <div class="hi-text">
+        QUORUM gives DAOs private governance where it matters and public proof where it counts.
+      </div>
+      <a href="/dashboard" target="_parent" class="hi-btn">ENTER GOVERNANCE</a>
+    </div>
+
+    <div class="scroll-content-wrapper">
+      <div class="scroll-title-container" id="scroll-title">
+        <h3 class="animated-title flow-title">Private governance<br>for serious onchain<br><span style="font-weight: 500;">organizations</span></h3>
+      </div>
+
+      <div class="clients-container">
+        <div class="clients-subtitle">PROTOCOL PRIMITIVES</div>
+        <div class="clients-line"></div>
+        <div class="marquee-container">
+          <div class="marquee-content">
+            <!-- Set 1 -->
+            <span class="marquee-pill"><span class="dot"></span>Sealed Ballots</span>
+            <span class="marquee-pill"><span class="dot"></span>MPC Tally</span>
+            <span class="marquee-pill"><span class="dot"></span>TEE Execution</span>
+            <span class="marquee-pill"><span class="dot"></span>ZK Correctness</span>
+            <span class="marquee-pill"><span class="dot"></span>Hidden Proposals</span>
+            <span class="marquee-pill"><span class="dot"></span>Confidential Treasury</span>
+            <span class="marquee-pill"><span class="dot"></span>Selective Disclosure</span>
+            <span class="marquee-pill"><span class="dot"></span>Solana L1</span>
+            <span class="marquee-pill"><span class="dot"></span>QRM Staking</span>
+            <span class="marquee-pill"><span class="dot"></span>Realms Integration</span>
+            <!-- Set 2 -->
+            <span class="marquee-pill"><span class="dot"></span>Sealed Ballots</span>
+            <span class="marquee-pill"><span class="dot"></span>MPC Tally</span>
+            <span class="marquee-pill"><span class="dot"></span>TEE Execution</span>
+            <span class="marquee-pill"><span class="dot"></span>ZK Correctness</span>
+            <span class="marquee-pill"><span class="dot"></span>Hidden Proposals</span>
+            <span class="marquee-pill"><span class="dot"></span>Confidential Treasury</span>
+            <span class="marquee-pill"><span class="dot"></span>Selective Disclosure</span>
+            <span class="marquee-pill"><span class="dot"></span>Solana L1</span>
+            <span class="marquee-pill"><span class="dot"></span>QRM Staking</span>
+            <span class="marquee-pill"><span class="dot"></span>Realms Integration</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="feature-container" style="align-items: flex-end; padding-right: 3.125rem; padding-left: 3.125rem; box-sizing: border-box;">
+        <h3 class="feature-title animated-title flow-title" style="text-align: right;">No live tally.<br>No whale-following.<br><span style="font-weight: 500;">No vote markets.</span></h3>
+        <div class="feature-support" style="text-align: right; align-self: flex-end;">
+          QUORUM hides running results until the vote closes, preventing bandwagoning and coercion.
+        </div>
+      </div>
+
+      <!-- ─── The four corruptions ─── -->
+      <section class="qrm-section" id="corruptions">
+        <div class="kicker">[ Problem · 002 ]</div>
+        <h3 class="feature-title animated-title flow-title" style="white-space: normal;">Public voting<br><span style="font-weight: 500;">is corruptible by design.</span></h3>
+        <div class="qrm-corruptions">
+          <div class="qrm-corr-row"><span class="l">Vote buying.</span><span class="r">Sealed votes · no enforceable bribe</span></div>
+          <div class="qrm-corr-row"><span class="l">Whale intimidation.</span><span class="r">Hidden tally · no bandwagoning</span></div>
+          <div class="qrm-corr-row"><span class="l">Proposal front-running.</span><span class="r">Hidden-until-execution proposals</span></div>
+          <div class="qrm-corr-row"><span class="l">Treasury exposure.</span><span class="r">Confidential treasury · selective disclosure</span></div>
+        </div>
+        <div class="qrm-sub">
+          Humanity abandoned public voting for a reason. QUORUM brings the secret ballot to Solana — private inputs, public proof.
+        </div>
+      </section>
+
+      <!-- ─── Four modules ─── -->
+      <section class="qrm-section" id="modules">
+        <div class="kicker">[ Architecture · 003 ]</div>
+        <h3 class="feature-title animated-title flow-title" style="white-space: normal;">Four composable modules.<br><span style="font-weight: 500;">One confidential stack.</span></h3>
+        <div class="qrm-tiles">
+          <div class="qrm-tile"><div class="num">Module I</div><div class="name">Sealed-Ballot Voting</div><div class="desc">Threshold-encrypted ballots, MPC/TEE tally, ZK proof of correctness. Receipt-free by construction.</div></div>
+          <div class="qrm-tile"><div class="num">Module II</div><div class="name">Hidden-Until-Execution Proposals</div><div class="desc">Encrypted payloads with public rules. Reveal on-pass or via timelock — no front-running window.</div></div>
+          <div class="qrm-tile"><div class="num">Module III</div><div class="name">Confidential Treasury</div><div class="desc">Token-2022 Confidential Balances. Auditor keys for selective disclosure. Solvency proofs without exposure.</div></div>
+          <div class="qrm-tile"><div class="num">Module IV</div><div class="name">Private Delegation + Eligibility</div><div class="desc">Prove voting weight without revealing balance. Nullifiers prevent double-voting; identities stay private.</div></div>
+        </div>
+      </section>
+
+      <!-- ─── Sealed-ballot flow ─── -->
+      <section class="qrm-section" id="how">
+        <div class="kicker">[ How it works · 004 ]</div>
+        <h3 class="feature-title animated-title flow-title" style="white-space: normal;">From eligibility to execution.<br><span style="font-weight: 500;">Six confidential steps.</span></h3>
+        <div class="qrm-steps">
+          <div class="qrm-step"><div class="n">01</div><div class="t">Prove eligibility</div><div class="d">ZK proof of voting rights and weight — no balance exposed.</div></div>
+          <div class="qrm-step"><div class="n">02</div><div class="t">Encrypt ballot</div><div class="d">Threshold encryption client-side. No plaintext leaves the browser.</div></div>
+          <div class="qrm-step"><div class="n">03</div><div class="t">Cast sealed</div><div class="d">Submit as on-chain commitment. Nullifier blocks double-votes.</div></div>
+          <div class="qrm-step"><div class="n">04</div><div class="t">MPC / TEE tally</div><div class="d">Confidential aggregation. No single party can decrypt a ballot.</div></div>
+          <div class="qrm-step"><div class="n">05</div><div class="t">ZK correctness proof</div><div class="d">Proves the result is the honest count of exactly the eligible votes.</div></div>
+          <div class="qrm-step"><div class="n">06</div><div class="t">Execute on-chain</div><div class="d">Solana verifies proof + attestation before the result can act.</div></div>
+        </div>
+      </section>
+
+      <!-- ─── A role for everyone ─── -->
+      <section class="qrm-section" id="roles">
+        <div class="kicker">[ Network · 005 ]</div>
+        <h3 class="feature-title animated-title flow-title" style="white-space: normal;">A role for everyone.<br><span style="font-weight: 500;">Not just DAOs.</span></h3>
+        <div class="qrm-roles">
+          <div class="qrm-role"><span class="who">DAO / Org</span><span class="what">Adopt QUORUM for confidential voting and treasury.</span><span class="earn">Pays per-vote fees</span></div>
+          <div class="qrm-role"><span class="who">Tally-node operator</span><span class="what">Stake QRM and run an MPC/TEE node that counts sealed votes.</span><span class="earn">Per-vote tally fees</span></div>
+          <div class="qrm-role"><span class="who">Proof verifier</span><span class="what">Stake QRM to independently re-verify tally correctness proofs.</span><span class="earn">Integrity fees</span></div>
+          <div class="qrm-role"><span class="who">QRM staker</span><span class="what">Stake without a node to secure the network and govern QUORUM.</span><span class="earn">USDC revenue share</span></div>
+          <div class="qrm-role"><span class="who">Delegate</span><span class="what">Accept private delegated voting weight and vote thoughtfully.</span><span class="earn">Delegation rewards</span></div>
+          <div class="qrm-role"><span class="who">Integration builder</span><span class="what">Build QUORUM into wallets, Realms, and DAO tooling.</span><span class="earn">Grants + share</span></div>
+        </div>
+      </section>
+
+      <!-- ─── QRM utility ─── -->
+      <section class="qrm-section" id="qrm">
+        <div class="kicker">[ Token · 006 ]</div>
+        <h3 class="feature-title animated-title flow-title" style="white-space: normal;">QRM powers<br><span style="font-weight: 500;">the confidential ballot box.</span></h3>
+        <div class="qrm-utils">
+          <div class="qrm-util"><div class="lbl">Governance-as-a-Service</div><div class="val">DAOs pay QRM (or USDC) per confidential vote and treasury operation.</div></div>
+          <div class="qrm-util"><div class="lbl">Tally-node staking</div><div class="val">Stake to run MPC/TEE nodes. Earn fees. Slashed for misbehavior.</div></div>
+          <div class="qrm-util"><div class="lbl">Fee discounts</div><div class="val">Stake QRM for reduced per-vote fees across adopters.</div></div>
+          <div class="qrm-util"><div class="lbl">Protocol governance</div><div class="val">QUORUM's own parameters governed confidentially. Dogfood the stack.</div></div>
+          <div class="qrm-util"><div class="lbl">Revenue share</div><div class="val">60 / 20 / 10 / 10 — tally nodes, stakers, burn, treasury.</div></div>
+          <div class="qrm-util"><div class="lbl">Buyback &amp; burn</div><div class="val">A portion of every fee permanently removes QRM from supply.</div></div>
+        </div>
+      </section>
+
+      <!-- ─── Competitive table ─── -->
+      <section class="qrm-section" id="compare">
+        <div class="kicker">[ Position · 007 ]</div>
+        <h3 class="feature-title animated-title flow-title" style="white-space: normal;">The only confidential<br><span style="font-weight: 500;">governance stack.</span></h3>
+        <div class="qrm-table-wrap">
+          <table class="qrm-table">
+            <thead>
+              <tr>
+                <th>Capability</th>
+                <th>Realms / Public DAO</th>
+                <th>Snapshot-style</th>
+                <th>Generic privacy</th>
+                <th class="q-col">QUORUM</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="row-l">Onchain voting</td><td>Yes</td><td class="x">Off-chain</td><td class="x">N/A</td><td class="q-col">Yes</td></tr>
+              <tr><td class="row-l">Sealed individual votes</td><td class="x">No</td><td class="x">No</td><td>Partial</td><td class="q-col">Yes</td></tr>
+              <tr><td class="row-l">Provably correct tally</td><td>Public count</td><td class="x">Trust-based</td><td class="x">No</td><td class="q-col">ZK proof</td></tr>
+              <tr><td class="row-l">Receipt-free (anti-bribe)</td><td class="x">No</td><td class="x">No</td><td class="x">No</td><td class="q-col">Yes</td></tr>
+              <tr><td class="row-l">Hidden-until-execution proposals</td><td class="x">No</td><td class="x">No</td><td class="x">No</td><td class="q-col">Yes</td></tr>
+              <tr><td class="row-l">Confidential treasury</td><td class="x">No</td><td class="x">No</td><td>Partial</td><td class="q-col">Yes</td></tr>
+              <tr><td class="row-l">Selective disclosure</td><td class="x">Public</td><td class="x">No</td><td>Partial</td><td class="q-col">Yes</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ─── Roadmap ─── -->
+      <section class="qrm-section" id="roadmap">
+        <div class="kicker">[ Roadmap · 008 ]</div>
+        <h3 class="feature-title animated-title flow-title" style="white-space: normal;">Sealed ballot first.<br><span style="font-weight: 500;">Everything compounds.</span></h3>
+        <div class="qrm-roadmap">
+          <div class="qrm-phase"><div class="ph">Phase 1</div><div class="weeks">1–6</div><div class="focus">Sealed-ballot voting</div><div class="ms">Vote program, encrypted submission, MPC/TEE tally, ZK correctness, QRM token.</div></div>
+          <div class="qrm-phase"><div class="ph">Phase 2</div><div class="weeks">7–12</div><div class="focus">Hidden proposals + delegation</div><div class="ms">Hidden-until-execution, ZK eligibility, receipt-freeness hardening.</div></div>
+          <div class="qrm-phase"><div class="ph">Phase 3</div><div class="weeks">13–18</div><div class="focus">Confidential treasury</div><div class="ms">Encrypted treasury, auditor-key disclosure, solvency proofs.</div></div>
+          <div class="qrm-phase"><div class="ph">Phase 4</div><div class="weeks">19–24</div><div class="focus">Governance-as-a-Service</div><div class="ms">SDK, hosted app, Realms integration, staking network, first DAOs.</div></div>
+          <div class="qrm-phase"><div class="ph">Phase 5</div><div class="weeks">25–32</div><div class="focus">Enterprise · real-world orgs</div><div class="ms">Compliance tooling for co-ops, unions, associations. Audited secret-ballot.</div></div>
+        </div>
+      </section>
+
+      <!-- ─── Trust strip ─── -->
+      <section class="qrm-section" id="trust">
+        <div class="kicker">[ Live · 009 ]</div>
+        <h3 class="feature-title animated-title flow-title" style="white-space: normal;">Privacy you can sense.<br><span style="font-weight: 500;">Integrity you can verify.</span></h3>
+        <div class="qrm-trust">
+          <div class="cell"><div class="num">128,402</div><div class="lbl">Sealed ballots cast</div></div>
+          <div class="cell"><div class="num">1,408</div><div class="lbl">Tallies proven honest</div></div>
+          <div class="cell"><div class="num"><span class="zero">0</span></div><div class="lbl">Individual votes ever exposed</div></div>
+        </div>
+      </section>
+    </div>
+
+
+    <div class="phase4-container" id="phase4-container" style="font-family: 'Sarabun', sans-serif;">
+      <div class="split-feature-container">
+        <div class="hi-top" style="width: 100%; min-width: 15rem; max-width: 22rem; margin-bottom: 0;">
+          <span>( QRM )</span>
+          <span>[ 001 / SEALED VOTE ]</span>
+        </div>
+
+        <div style="display: flex; flex-direction: column; align-items: flex-start;">
+          <div class="split-top" style="text-align: left; display: inline-block;">
+            <h3 class="feature-title animated-title" id="phase4-title" style="text-align: left; margin-top: 0;">
+              Cast a sealed vote.<br><span style="font-weight: 500;">Verify the honest count.</span>
+            </h3>
+            <div class="clients-line" style="margin-top: 3rem; margin-bottom: 3rem; width: 100%; margin-left: 0; margin-right: 0;"></div>
+          </div>
+
+          <div class="split-bottom" style="align-items: flex-start;">
+            <div class="hi-text" style="text-align: left; max-width: 32rem;">
+              Members prove eligibility with ZK, encrypt their ballot client-side, and receive proof they voted — without revealing their choice.
+            </div>
+            <a href="/dashboard?tab=vote" target="_parent" class="hi-btn" style="margin-top: 1.5rem;">CAST SEALED BALLOT</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="words-container">
+      <div class="flying-word" id="word1">
+        <span class="char">V</span><span class="char">o</span><span class="char">t</span><span class="char">e</span>
+      </div>
+      <div class="flying-word" id="word2">
+        <span class="char">S</span><span class="char">e</span><span class="char">a</span><span class="char">l</span>
+      </div>
+      <div class="flying-word" id="word3">
+        <span class="char">P</span><span class="char">r</span><span class="char">o</span><span class="char">v</span><span class="char">e</span>
+      </div>
+    </div>
+
+    <div class="glass-container" id="glass-container">
+      <div id="glass-gradient" class="glass-gradient-wrapper">
+        <img src="/gradient.png" class="glass-gradient-img" alt="QUORUM gradient" />
+        <div class="gradient-content">
+          <div class="gc-top-left animated-title" id="phase3-title">Private inputs.<br>Public proof.</div>
+          <div class="gc-bottom">
+            <div class="gc-bottom-left">Governance primitives</div>
+            <div class="gc-bottom-right">
+              <div class="stat-col stat-col-tall">
+                <div class="stat-num">01</div>
+                <div class="stat-label">Sealed Ballots</div>
+                <div class="stat-desc">Individual choices encrypted before submission.</div>
+              </div>
+              <div class="stat-col">
+                <div class="stat-num">02</div>
+                <div class="stat-label">ZK Tally Proof</div>
+                <div class="stat-desc">Final results verified without exposing votes.</div>
+              </div>
+              <div class="stat-col">
+                <div class="stat-num">03</div>
+                <div class="stat-label">Confidential Treasury</div>
+                <div class="stat-desc">Balances and transfers hidden with selective disclosure.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="phase5-container" id="phase5-container" style="font-family: 'Sarabun', sans-serif;">
+      <div class="hi-top phase5-label-right">
+        <span>( QRM )</span>
+        <span>[ 003 / 004 ]</span>
+      </div>
+      <h3 class="feature-title phase5-title-left animated-title" id="phase5-title-1">
+        Governance without<br><span style="font-weight: 500;">the show of hands</span>
+      </h3>
+
+      <div class="hi-text phase5-desc-left">
+        Public voting creates vote-buying, whale intimidation, proposal front-running, and treasury exposure. QUORUM fixes the structure.
+      </div>
+      <h3 class="feature-title phase5-title-right animated-title" id="phase5-title-2">
+        Built for<br><span style="font-weight: 500;">DAOs, protocols</span><br>and foundations
+      </h3>
+    </div>
+
+    <div class="phase6-container" id="phase6-container">
+      <h3 class="phase6-title animated-title" id="phase6-title">
+        The future of<br><span style="font-weight: 400;">confidential governance</span>
+      </h3>
+      <div class="phase6-subline">Private where it should be. Transparent where it must be.</div>
+    </div>
+
+    <div class="phase6-footer-wrapper" id="phase6-footer">
+      <div class="glass-footer">
+        <div class="footer-top">
+          <div class="footer-left">
+            <h2 class="footer-brand">QUORU<span class="dot">M</span></h2>
+            <p class="footer-tagline">Confidential governance infrastructure on Solana. Sealed votes, provable tally, private treasury.</p>
+            <div class="footer-socials">
+              <a class="footer-social" href="https://x.com/QuorumPrivacy" target="_blank" rel="noopener noreferrer" aria-label="QUORUM on X">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M18.244 2H21.5l-7.51 8.59L23 22h-6.84l-5.36-7.02L4.6 22H1.34l8.04-9.2L1 2h6.99l4.85 6.41L18.24 2Zm-1.2 18h1.9L7.04 4H5.04l12 16Z"/>
+                </svg>
+              </a>
+              <a id="telegram-btn" class="footer-social" href="https://t.me/quorumsol" target="_blank" rel="noopener noreferrer" aria-label="QUORUM on Telegram">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M9.78 17.6 9.6 14l9.4-8.5c.42-.38-.09-.56-.65-.22L7.1 12.5 2.1 10.92c-1.07-.32-1.08-1.07.24-1.59L20.5 2.4c.89-.4 1.74.22 1.4 1.59L18.78 19.6c-.23 1.1-.9 1.36-1.83.85L12.4 17l-2.31 2.24c-.27.27-.5.5-1 .5l.7-2.13Z"/>
+                </svg>
+              </a>
+              <a class="footer-social" href="https://github.com/QuorumP/QuorumPrivacy" target="_blank" rel="noopener noreferrer" aria-label="QUORUM on GitHub">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M12 .5C5.37.5 0 5.87 0 12.5c0 5.3 3.44 9.8 8.21 11.39.6.11.82-.26.82-.58 0-.29-.01-1.05-.02-2.06-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.09-.75.08-.73.08-.73 1.21.09 1.84 1.24 1.84 1.24 1.07 1.83 2.81 1.3 3.5.99.11-.78.42-1.3.76-1.6-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.12-.3-.54-1.52.12-3.17 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.29-1.55 3.3-1.23 3.3-1.23.66 1.65.24 2.87.12 3.17.77.84 1.24 1.91 1.24 3.22 0 4.61-2.81 5.62-5.49 5.92.43.37.81 1.1.81 2.22 0 1.6-.01 2.9-.01 3.29 0 .32.22.7.83.58A12.01 12.01 0 0 0 24 12.5C24 5.87 18.63.5 12 .5Z"/>
+                </svg>
+              </a>
+            </div>
+          </div>
+
+          <div class="footer-right">
+            <div class="footer-col">
+              <div class="footer-col-title">Protocol</div>
+              <a href="#corruptions">Four Corruptions</a>
+              <a href="#modules">Four Modules</a>
+              <a href="#how">How It Works</a>
+            </div>
+            <div class="footer-col">
+              <div class="footer-col-title">Network</div>
+              <a href="#roles">Roles</a>
+              <a href="#qrm">QRM Token</a>
+              <a href="/dashboard?tab=stake" target="_parent">Staking</a>
+            </div>
+            <div class="footer-col">
+              <div class="footer-col-title">Resources</div>
+              <a href="#compare">Compare</a>
+              <a href="#roadmap">Roadmap</a>
+              <a href="/docs" target="_parent">Docs</a>
+            </div>
+            <div class="footer-col">
+              <div class="footer-col-title">App</div>
+              <a href="/dashboard" target="_parent">Dashboard</a>
+              <a href="/dashboard?tab=vote" target="_parent">Voting</a>
+              <a href="/dashboard?tab=treasury" target="_parent">Treasury</a>
+              <a href="/dashboard?tab=explorer" target="_parent">Explorer</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="footer-line"></div>
+        <div class="footer-bottom">
+          <span>© 2026 QUORUM Protocol · All rights reserved</span>
+          <span class="built">Built on Solana</span>
+        </div>
+      </div>
+      </div>
+
+    </div>
+
+    <script>
+      (function(){
+        function scrollToHash(hash){
+          var el = document.querySelector(hash);
+          if (!el) return false;
+          var lenis = window.__lenis;
+          if (lenis && typeof lenis.scrollTo === 'function') {
+            lenis.scrollTo(el, { offset: -40, duration: 1.6 });
+          } else {
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+          try { history.replaceState(null, '', hash); } catch(_){}
+          return true;
+        }
+        function navigateParent(href){
+          if (!href) return false;
+          // Same-page hash anchors: smooth-scroll instead of navigating
+          if (href.charAt(0) === '#') {
+            return scrollToHash(href);
+          }
+          var url = new URL(href, window.location.origin);
+          if (url.origin !== window.location.origin) return false;
+          // Hash on current path: smooth-scroll
+          if (url.pathname === window.location.pathname && url.hash) {
+            return scrollToHash(url.hash);
+          }
+          var next = url.pathname + url.search + url.hash;
+          try { window.parent.location.href = next; }
+          catch (_) { window.location.href = next; }
+          return true;
+        }
+        function bindRouteLinks(){
+          document.addEventListener('click', function(e){
+            var link = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+            if (!link) return;
+            if (link.target === '_blank' || link.hasAttribute('download')) return;
+            if (navigateParent(link.getAttribute('href'))) {
+              e.preventDefault();
+              e.stopPropagation();
+            }
+          }, true);
+        }
+        function bindHamburger(){
+          var h = document.getElementById('hero-hamburger');
+          var nav = document.getElementById('hero-nav');
+          if (!h || !nav) return;
+          h.addEventListener('click', function(e){
+            e.stopPropagation();
+            var open = nav.classList.toggle('open');
+            h.classList.toggle('open', open);
+            h.setAttribute('aria-expanded', open ? 'true' : 'false');
+          });
+          nav.addEventListener('click', function(e){
+            if (e.target && e.target.tagName === 'A') {
+              nav.classList.remove('open');
+              h.classList.remove('open');
+              h.setAttribute('aria-expanded', 'false');
+            }
+          });
+          document.addEventListener('click', function(e){
+            if (!nav.contains(e.target) && !h.contains(e.target)) {
+              nav.classList.remove('open');
+              h.classList.remove('open');
+              h.setAttribute('aria-expanded', 'false');
+            }
+          });
+        }
+        function init(){ bindRouteLinks(); bindHamburger(); }
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+        else init();
+      })();
+    </script>
+
+    <script type="importmap">
+{
+  "imports": {
+    "three": "https://esm.sh/three@0.184.0",
+    "three/": "https://esm.sh/three@0.184.0/",
+    "lil-gui": "https://esm.sh/lil-gui@0.21.0",
+    "lenis": "https://esm.sh/lenis@1.3.23"
+  }
+}
+</script>
+<script type="module" src="/main.js"></script>
+  </body>
+</html>

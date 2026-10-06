@@ -1,0 +1,12 @@
+﻿import { buildPoseidon } from "circomlibjs";
+import { poseidon1, poseidon2 } from "poseidon-lite";
+const p = await buildPoseidon();
+const F = p.F;
+const a = 12345678901234567890n, b = 98765432109876543210n;
+const c1 = BigInt(F.toString(p([a])));
+const l1 = poseidon1([a]);
+const c2 = BigInt(F.toString(p([a, b])));
+const l2 = poseidon2([a, b]);
+console.log("poseidon1 match:", c1 === l1);
+console.log("poseidon2 match:", c2 === l2);
+process.exit(c1 === l1 && c2 === l2 ? 0 : 1);

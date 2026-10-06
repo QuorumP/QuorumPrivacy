@@ -1,0 +1,400 @@
+{
+  "address": "BHdjYZbXw6ay5qpGcrG3fGb4bmoAnZNKv3fKZ9Gxff6w",
+  "metadata": {
+    "name": "quorum_anchor",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "QUORUM on-chain anchor: eligibility/ballot/result roots per vote"
+  },
+  "docs": [
+    "QUORUM on-chain anchor — cost-minimal. Stores ONLY roots/hashes per vote (no per-ballot",
+    "accounts): the eligibility Merkle root, the ballot-commitment root, and the final tally",
+    "result hash. One small, closable PDA per vote. All ballots/commitments live off-chain in",
+    "Supabase; only these anchors are committed on devnet."
+  ],
+  "instructions": [
+    {
+      "name": "close_vote",
+      "docs": [
+        "Reclaim rent once a vote is archived (closable PDA — keeps on-chain footprint near zero)."
+      ],
+      "discriminator": [
+        137,
+        152,
+        87,
+        249,
+        170,
+        239,
+        133,
+        59
+      ],
+      "accounts": [
+        {
+          "name": "vote",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  111,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vote.vote_id",
+                "account": "VoteAnchor"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "commit_ballots",
+      "docs": [
+        "Anchor the ballot-commitment Merkle root (one root for all ballots) and move to tallying."
+      ],
+      "discriminator": [
+        220,
+        151,
+        26,
+        48,
+        145,
+        19,
+        124,
+        25
+      ],
+      "accounts": [
+        {
+          "name": "vote",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  111,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vote.vote_id",
+                "account": "VoteAnchor"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "ballot_root",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "register_vote",
+      "docs": [
+        "Register a vote and anchor its eligibility snapshot root."
+      ],
+      "discriminator": [
+        115,
+        72,
+        69,
+        208,
+        153,
+        57,
+        252,
+        35
+      ],
+      "accounts": [
+        {
+          "name": "vote",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  111,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "vote_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "address": "9sjBajqChwe1BDCa9gxAG46qgJzMwgKPe1mi64T24ZYC"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "vote_id",
+          "type": "string"
+        },
+        {
+          "name": "eligibility_root",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "submit_tally",
+      "docs": [
+        "Anchor the final tally result hash (gate for execution) and mark verified."
+      ],
+      "discriminator": [
+        103,
+        30,
+        76,
+        48,
+        233,
+        16,
+        128,
+        68
+      ],
+      "accounts": [
+        {
+          "name": "vote",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  111,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vote.vote_id",
+                "account": "VoteAnchor"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "result_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "verify_solvency",
+      "docs": [
+        "Verify a Groth16 solvency proof (reserves ≥ threshold) ON-CHAIN via alt_bn128 pairing.",
+        "Fails the transaction if the proof is invalid, so an unbacked solvency claim cannot be",
+        "recorded. `proof_a` must be pre-negated by the client. Public inputs: [threshold, commitment].",
+        "This is the reusable on-chain Groth16 verification path (same shape a tally-correctness",
+        "proof would use)."
+      ],
+      "discriminator": [
+        68,
+        230,
+        13,
+        65,
+        112,
+        20,
+        59,
+        45
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "proof_a",
+          "type": {
+            "array": [
+              "u8",
+              64
+            ]
+          }
+        },
+        {
+          "name": "proof_b",
+          "type": {
+            "array": [
+              "u8",
+              128
+            ]
+          }
+        },
+        {
+          "name": "proof_c",
+          "type": {
+            "array": [
+              "u8",
+              64
+            ]
+          }
+        },
+        {
+          "name": "threshold",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "commitment",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "VoteAnchor",
+      "discriminator": [
+        174,
+        57,
+        164,
+        11,
+        198,
+        180,
+        152,
+        108
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "IdTooLong",
+      "msg": "vote id too long (max 32)"
+    },
+    {
+      "code": 6001,
+      "name": "Unauthorized",
+      "msg": "unauthorized"
+    },
+    {
+      "code": 6002,
+      "name": "BadState",
+      "msg": "invalid state transition"
+    },
+    {
+      "code": 6003,
+      "name": "InvalidProof",
+      "msg": "groth16 proof failed on-chain verification"
+    }
+  ],
+  "types": [
+    {
+      "name": "VoteAnchor",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "vote_id",
+            "type": "string"
+          },
+          {
+            "name": "eligibility_root",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "ballot_root",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "result_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "type": "u8"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ]
+}

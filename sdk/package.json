@@ -1,0 +1,32 @@
+{
+  "name": "@quorum/sdk",
+  "version": "0.1.0",
+  "description": "Client-side confidential-governance crypto primitives for Solana DAOs (QUORUM): sealed ballots, trustless tally verification, hidden proposals, and auditor selective disclosure.",
+  "type": "module",
+  "main": "./index.ts",
+  "types": "./index.ts",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "files": [
+    "index.ts",
+    "README.md"
+  ],
+  "keywords": [
+    "solana",
+    "dao",
+    "governance",
+    "zero-knowledge",
+    "elgamal",
+    "confidential-voting",
+    "quorum"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@noble/curves": "^1.9.7",
+    "@noble/hashes": "^1.8.0"
+  },
+  "scripts": {
+    "example": "tsx example.ts"
+  }
+}

@@ -1,0 +1,84 @@
+# Security Policy
+
+QUORUM runs on **Solana devnet only**. QRM is a devnet token with no market value. Do not use
+QUORUM with real value until the mainnet checklist below is complete.
+
+## Reporting a vulnerability
+
+Please report privately through GitHub: **Security → Report a vulnerability** on
+[QuorumP/QuorumPrivacy](https://github.com/QuorumP/QuorumPrivacy/security/advisories/new).
+Do not open a public issue for anything exploitable.
+
+Include the affected file or endpoint, the steps to reproduce, and the impact you expect. We aim
+to acknowledge within 72 hours and to ship a fix or mitigation for Critical and High issues
+within 7 days. There is no bug bounty during the devnet phase.
+
+## Privileged roles
+
+Every privileged power today, and who holds it.
+
+| Power | Holder | Notes |
+| :-- | :-- | :-- |
+| Upgrade the `quorum_anchor` program | Single key `9sjBajqChwe1BDCa9gxAG46qgJzMwgKPe1mi64T24ZYC` | Upgradeable BPF program. Held as a hot key by the app server. |
+| QRM mint, freeze, transfer-fee and metadata authority | Same key | Token-2022 mint `HjQdV3YTpdJmThMuxe9Tvx8zJV9fHxZo5T3cA8Fhgvsw`. |
+| Stake vault (pays unstakes) | Same key, as token owner | Dedicated account `DUbNMfraNdmo3R4L8Yfmhybw5pUmUcKUAGPnKZqw3jBz`, separate from the faucet supply. |
+| Faucet (devnet only) | Same key, from its own token account | 500 QRM per drip, 3 per wallet per hour, 200 per day globally. |
+| Anchor votes and tallies on-chain | Same key | `register_vote` only accepts this key; `commit_ballots`, `submit_tally`, `close_vote` require the vote's registering key. |
+| Create votes, change settings, manage auditors and disclosures, publish solvency proofs | Wallets in `ADMIN_WALLETS` (two operator wallets) | Enforced server-side (`requireAdmin`). |
+| Decrypt tally totals | Operator's server | 3-of-5 threshold key, but all shares are held by one server today (see accepted risks). |
+| Tally a vote | The vote's creator after it closes; wallets in `ADMIN_WALLETS` at any time | Enforced in `runTally`. |
+| Database | Operator (Supabase `postgres` role used by the server, over CA-verified TLS) | Public tables are read-only to anonymous clients; members, ballots and ledgers deny anonymous access. |
+
+## Mainnet handoff plan
+
+None of the following is optional. Mainnet is blocked until every item is done and verified:
+
+1. Move the program upgrade authority to a Squads v4 multisig with a time lock, or make the
+   program immutable.
+2. Move the QRM mint and fee authorities to the multisig (or revoke minting after final supply);
+   remove the freeze authority.
+3. Move the stake vault to a program-owned account so no hot key can move staked funds.
+4. Run a real distributed key generation with independent tally operators; remove all tally
+   shares from the app server.
+5. Run a multi-party trusted-setup ceremony for both circuits and publish the transcript.
+6. Disable the faucet.
+7. Build with `solana-verify build`, deploy that artifact, and publish its hash.
+8. Complete an external security audit.
+
+## Trust assumptions and accepted risks (devnet)
+
+These are known limits of the current deployment, accepted for the devnet phase and fixed by the
+handoff plan above.
+
+| Risk | Severity | Why it is accepted on devnet |
+| :-- | :-- | :-- |
+| All threshold tally shares sit on one server, so the operator could decrypt an individual ballot. | Medium | Tally correctness is still publicly verifiable (DLEQ proofs). Ballot privacy from the operator needs distributed key holders (item 4). |
+| One hot key holds every on-chain authority. | Low (devnet) | No value at stake. Becomes High on mainnet, hence items 1–3. |
+| Groth16 proving keys come from a single-party setup. | Medium | The setup contributor could forge proofs. Item 5 replaces it. |
+| Tally-node and TEE attestation rows in the dashboard are illustrative. | Low | No hardware attestation is verified today. Counting runs on the operator's server. |
+
+## Invariants and the tests that hold them
+
+Server functions are tested end to end against Postgres (PGlite running the real migrations) and
+a fake devnet that tracks the stake vault separately from the database ledger. CI runs every
+suite on each push, fails if line coverage of the server, crypto and ZK code drops below 85%,
+and runs a mutation sample (`scripts/test/mutants.mjs`). That sample plants each bug below, plus
+others, and fails if any of them goes undetected.
+
+| Invariant | Test |
+| :-- | :-- |
+| The vault's on-chain balance always equals the sum of the stake ledger, and no wallet's stake goes negative, under random concurrent stakes, unstakes and every payout failure mode | `src/fn/stake.test.ts` "stake ledger invariants" |
+| Concurrent unstakes never pay out more than the stake | `stake.test.ts` "concurrent unstakes…" |
+| A stake transaction is credited once, only to the wallet that signed it, for the vault's actual balance change | `stake.test.ts`, `src/lib/solana/qrm.test.ts` |
+| One ballot per member per vote: nullifiers are canonical, identities are write-once, proofs are bound to the vote's frozen eligibility snapshot | `src/fn/voting.test.ts` |
+| Every stored ballot encrypts exactly one 1, and ballots are re-randomized before storage | `voting.test.ts`, `src/lib/crypto/properties.test.ts` |
+| A published tally verifies only if it is the honest decryption of the stored ballots under the official key | `voting.test.ts` "runTally / verifyTally" |
+| Admin functions refuse every non-admin; every mutation refuses anonymous callers | `src/fn/admin.test.ts` "authorization matrix" |
+| Public read endpoints expose no ballot, identity, sealed proposal, disclosure or delegation data | `src/fn/data.test.ts` |
+| A sign-in signature works once, only for its wallet and our domain | `src/fn/auth.test.ts` |
+| On-chain: only the vote's authority advances it, states move strictly open → tallying → verified, and verifier inputs must be canonical | `onchain/programs/quorum_anchor/src/tests.rs`, `groth16.rs`, `scripts/onchain/anchor-vote.mjs` (devnet) |
+
+## Audit history
+
+See [CHANGELOG.md](CHANGELOG.md) for security fixes. An AI-assisted audit (2026-10-06) found
+4 Critical and 5 High issues; all of them are fixed.
