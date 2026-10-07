@@ -27,7 +27,7 @@ const SECTIONS: { h: string; p: string[] }[] = [
     h: "2. What QUORUM Does NOT Collect",
     p: [
       "We do not collect: your individual vote choice, your treasury balance, the plaintext of hidden proposals, your private key or seed phrase, your real-world identity, or your IP-to-wallet linkage.",
-      "Sealed ballots are encrypted client-side using threshold encryption. The tally is computed inside an MPC/TEE network. Only the final aggregate result, a ZK correctness proof, and tally-node attestations are written on-chain.",
+      "Sealed ballots are encrypted client-side using threshold encryption. On devnet the tally is computed by the operator's server, which decrypts only the per-option totals and publishes proofs that anyone can use to verify them. Only the eligibility root, the ballot-commitment root and the result hash are written on-chain.",
     ],
   },
   {

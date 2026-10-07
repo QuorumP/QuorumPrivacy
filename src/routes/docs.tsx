@@ -264,8 +264,8 @@ await verifySignature({ data: { wallet, nonce, signature } });
             </P>
             <P><strong style={{ color: palette.gold }}>1. Encrypt the choice.</strong> The vote is one hot encoded over the option set and encrypted with exponential ElGamal over Ristretto255. Because the scheme is additively homomorphic, encrypted ballots can be summed and only the totals decrypted.</P>
             <P><strong style={{ color: palette.gold }}>2. Prove eligibility.</strong> The browser generates a Groth16 proof of membership in the eligibility Merkle tree plus a unique nullifier, without revealing identity or balance. The nullifier prevents double voting.</P>
-            <P><strong style={{ color: palette.gold }}>3. Tally with a threshold key.</strong> Decryption uses a 3 of 5 threshold key produced by a Pedersen DKG, so no single party holds the secret. The server sums the ciphertexts and recovers only the per option totals.</P>
-            <P><strong style={{ color: palette.gold }}>4. Prove the tally is honest.</strong> Each partial decryption carries a Chaum Pedersen DLEQ proof. Anyone can verify that the announced totals are the honest decryption of the sealed ballots, with no trust in the server.</P>
+            <P><strong style={{ color: palette.gold }}>3. Tally with a threshold key.</strong> Decryption uses a 3 of 5 threshold key produced by a Pedersen DKG. The server sums the ciphertexts and recovers only the per option totals. On devnet all five shares are held by the operator's server, so the operator could decrypt an individual ballot; independent tally nodes holding one share each are planned.</P>
+            <P><strong style={{ color: palette.gold }}>4. Prove the tally is honest.</strong> Each partial decryption carries a Chaum Pedersen DLEQ proof. Anyone can verify that the announced totals are the honest decryption of the stored sealed ballots under the published tally key, without trusting the server's arithmetic.</P>
             <Callout label="Receipt free">
               The protocol re randomizes ciphertexts so a voter cannot prove to a briber what they
               submitted. The participation receipt proves that you voted, never how you voted.
@@ -330,9 +330,10 @@ await clearDelegation();                        // vote your own weight again`}<
           <Section id="staking" kicker="Network" title="QRM Staking">
             <P>
               QRM is a Token 2022 mint on devnet. Staking is a real on chain transfer from your wallet to
-              the protocol vault, confirmed by the server before the ledger is credited. Tally nodes stake
-              QRM to run the confidential counting network and earn per vote fees. Misbehavior, such as
-              leaking a ballot, censoring, or a false tally, is slashed.
+              the protocol vault, confirmed by the server before the ledger is credited. Staking at least
+              100 QRM makes a wallet eligible to vote; it pays no yield or fees. Planned: tally nodes stake QRM
+              to hold key shares, with slashing for leaking a ballot, censoring, or a false tally. Neither
+              tally nodes nor slashing exist on devnet yet.
             </P>
             <Code>{`await qrmFaucet();                              // devnet drip of QRM
 const sig = await wallet.signAndSendTransaction(stakeTx); // Token 2022 transfer to the vault
@@ -375,7 +376,7 @@ await unstakeQrm({ data: { amount } });                   // vault returns QRM, 
             <P>
               The <Mono>@quorum/sdk</Mono> package exposes the same client side primitives QUORUM uses in
               production, so anything you seal is compatible with the live tally. Everything runs client
-              side: no server, no secret keys, no trust. You seal with public inputs, and you verify with
+              side: no server and no secret keys. You seal with public inputs, and you verify with
               only the published transcript.
             </P>
             <Code>{`npm add @quorum/sdk
@@ -400,16 +401,16 @@ const { verified, totals } = verifyTally(transcript);`}</Code>
           </Section>
 
           <Section id="security" kicker="Guarantees" title="Security Model">
-            <P>QUORUM is designed to fail closed. Each guarantee is enforced by cryptography, not by policy.</P>
+            <P>QUORUM is designed to fail closed. The table shows what holds on devnet today, including where it still relies on the operator.</P>
             <DefTable
               head={["Property", "How it holds"]}
               rows={[
-                ["Ballot privacy", "Choices are encrypted client side to a threshold key; no single party can decrypt."],
+                ["Ballot privacy", "Choices are encrypted client side to a 3 of 5 threshold key. On devnet one server holds all shares, so the operator is trusted not to decrypt single ballots."],
                 ["Receipt freeness", "Ciphertexts are re randomized, so a voter cannot prove a choice to a briber."],
                 ["No double voting", "A unique nullifier per voter per vote, enforced in the database and at tally."],
                 ["Tally correctness", "Chaum Pedersen DLEQ proofs make the totals verifiable by anyone."],
                 ["No live tally", "The running result is hidden until close, which defeats whale following."],
-                ["Solvency without exposure", "A range proof proves reserves meet a threshold while the balance stays hidden."],
+                ["Solvency without exposure", "A range proof shows a committed balance meets a threshold while the balance stays hidden. The commitment is not yet tied to the real treasury balance."],
                 ["Fails closed", "An invalid proof is rejected; no valid proof means no execution."],
               ]}
             />

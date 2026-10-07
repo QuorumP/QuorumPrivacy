@@ -799,10 +799,9 @@ function VoteTab({ wallet }: { wallet: ReturnType<typeof useWallet> }) {
       <div style={{ display: "grid", gap: "1.5rem", alignContent: "start" }}>
         <Panel title="Protocol Status">
           <div style={{ display: "grid", gap: "0.85rem" }}>
-            <StatusRow label="Tally network" value={`${status.nodes} nodes · 3-of-5 threshold`} ok />
+            <StatusRow label="Tally key" value="3-of-5 threshold · shares on one server (devnet)" ok={false} />
             <StatusRow label="ZK verifier" value="Operational" ok />
-            <StatusRow label="Slashing events" value={`${status.slashEvents} lifetime`} ok />
-            <StatusRow label="Avg seal-to-proof" value="34s" ok />
+            <StatusRow label="Slashing" value="Not implemented yet" ok={false} />
           </div>
         </Panel>
         <Panel title="Your participation">
@@ -1590,16 +1589,16 @@ function StakeTab({ wallet, goTab }: { wallet: ReturnType<typeof useWallet>; goT
         Icon={Coins}
         kicker="QRM Staking"
         title="Stake QRM."
-        highlight="Secure the secret ballot. Earn fees."
-        desc="Planned: tally nodes stake QRM to run MPC/TEE counting, with slashing for misbehavior. On devnet today, the tally runs on the operator's server and its correctness is proven with public DLEQ proofs."
+        highlight="Stake to become an eligible voter."
+        desc="On devnet, staking at least 100 QRM makes your wallet eligible to vote. Staking pays no yield or fees. Planned: tally nodes stake QRM to hold key shares, with slashing for misbehavior. Today the tally runs on the operator's server and its correctness is proven with public DLEQ proofs."
         cta="View Proof Explorer"
         onClick={() => goTab("explorer")}
       />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem" }}>
-        <KV label="Network APY" value="~8% + fees" Icon={Sparkles} />
-        <KV label="Revenue Split" value="60 / 20 / 10 / 10" Icon={SlidersHorizontal} />
+        <KV label="Staking rewards" value="None (devnet)" Icon={Sparkles} />
+        <KV label="Voting eligibility" value="≥ 100 QRM staked" Icon={SlidersHorizontal} />
         <KV label="Active Tally Nodes" value={String(nodes.length)} Icon={Server} />
-        <KV label="Slashing Events" value={`${nodes.reduce((s, n) => s + n.slash, 0)} lifetime`} Icon={ShieldCheck} />
+        <KV label="Slashing" value="Not implemented" Icon={ShieldCheck} />
       </div>
       <Panel title="Stake QRM" subtitle="Real Token-2022 transfer on devnet">
         {!wallet.address ? (
@@ -1756,7 +1755,7 @@ function CreateVoteModal({ open, onClose }: { open: boolean; onClose: () => void
 
 function DocsTab() {
   const docs: { t: string; d: string; Icon: typeof Vote }[] = [
-    { t: "Sealed-Ballot Voting", d: "Threshold encryption client-side; tally inside MPC/TEE; ZK correctness proof on-chain before execution.", Icon: Vote },
+    { t: "Sealed-Ballot Voting", d: "Threshold encryption client-side; totals-only decryption with public DLEQ correctness proofs; result hash anchored on-chain.", Icon: Vote },
     { t: "Hidden-Until-Execution Proposals", d: "Encrypted payloads with public rules; reveal on-pass or timelock; eliminates the front-run window.", Icon: FileLock2 },
     { t: "Confidential Treasury", d: "Token-2022 Confidential Balances + auditor key for selective disclosure and solvency proofs.", Icon: Landmark },
     { t: "Private Delegation + ZK Eligibility", d: "Prove voting weight without revealing balance. Nullifier prevents double-voting.", Icon: KeyRound },
@@ -1784,15 +1783,15 @@ function DocsTab() {
         ))}
       </div>
 
-      <Panel title="Solana programs" subtitle="6 Anchor programs · on-chain enforcement">
+      <Panel title="Solana programs" subtitle="1 live on devnet (quorum_anchor) · the rest are planned">
         <div style={{ display: "grid", gap: "0.5rem", fontSize: "0.85rem" }}>
           {[
-            { p: "VoteRegistry", d: "Vote lifecycle, eligibility snapshot, nullifier set, ballot commitments.", t: "7 days" },
-            { p: "TallyVerifier", d: "Verify ZK correctness proof + MPC/TEE attestation before execution.", t: "7 days" },
-            { p: "ProposalVault", d: "Hidden proposals, reveal logic, execution.", t: "14 days" },
-            { p: "ConfidentialTreasury", d: "Encrypted treasury, selective disclosure, solvency proofs.", t: "14 days" },
-            { p: "QRMStaking", d: "Tally-node staking, fee distribution, slashing.", t: "14 days" },
-            { p: "Governance", d: "QUORUM's own params, integration registry (Realms-compatible).", t: "21 days" },
+            { p: "quorum_anchor (live)", d: "Anchors each vote's eligibility root, ballot root and result hash; on-chain Groth16 solvency verifier.", t: "none (devnet)" },
+            { p: "TallyVerifier", d: "Planned: verify the tally correctness proof on-chain before execution.", t: "7 days" },
+            { p: "ProposalVault", d: "Planned: hidden proposals, reveal logic, execution.", t: "14 days" },
+            { p: "ConfidentialTreasury", d: "Planned: encrypted treasury, selective disclosure, solvency proofs.", t: "14 days" },
+            { p: "QRMStaking", d: "Planned: tally-node staking and slashing.", t: "14 days" },
+            { p: "Governance", d: "Planned: QUORUM's own params, integration registry (Realms-compatible).", t: "21 days" },
           ].map((r) => (
             <div key={r.p} className="qrm-docs-table-row" style={{ ...cardStyle, padding: "0.85rem 1.1rem", display: "grid", gridTemplateColumns: "12rem 1fr auto", gap: "1rem", alignItems: "center" }}>
               <span style={{ color: palette.gold, letterSpacing: "0.14em", textTransform: "uppercase", fontSize: "0.78rem" }}>{r.p}</span>
@@ -1803,7 +1802,7 @@ function DocsTab() {
         </div>
       </Panel>
 
-      <Panel title="SDK" subtitle="@quorum/sdk · client-side, no trust required">
+      <Panel title="SDK" subtitle="@quorum/sdk · client-side">
         <div style={{ opacity: 0.75, fontSize: "0.9rem", lineHeight: 1.55, marginBottom: "0.9rem" }}>
           The same confidential-governance primitives QUORUM runs in production — seal ballots,
           verify tallies trustlessly (DLEQ), commit hidden proposals, and disclose to auditors
@@ -1994,14 +1993,14 @@ function SettingsTab() {
         </div>
       </Panel>
 
-      <Panel title="Tally-node selection" subtitle="Threshold cluster · 7 / 9">
+      <Panel title="Tally-node applications" subtitle="Pending · nodes are not live on devnet">
         <div style={{ display: "grid", gap: "0.5rem", fontSize: "0.85rem" }}>
           {nodes.map((n) => (
             <div key={n.id} style={{ ...cardStyle, padding: "0.7rem 1rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <span style={{ display: "inline-flex", alignItems: "center", gap: "0.55rem" }}>
                 <Server size={12} color={palette.gold} />{n.id} · {n.attestation}
               </span>
-              <span style={{ color: "#7ddc9f", fontSize: "0.78rem" }}>Attesting · ✔</span>
+              <span style={{ opacity: 0.6, fontSize: "0.78rem" }}>Not attested</span>
             </div>
           ))}
         </div>

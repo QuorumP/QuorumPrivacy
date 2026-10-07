@@ -39,14 +39,14 @@ const SECTIONS: { h: string; p: string[] }[] = [
   {
     h: "4. QRM Token",
     p: [
-      "QRM is a Token-2022 utility token used to stake tally nodes, secure the confidential counting network, and participate in protocol governance. QRM is not an investment contract, security, or claim on revenue of any entity.",
+      "QRM is a Token-2022 test token on Solana devnet. Staking it makes a wallet eligible to vote; it pays no yield, fees or revenue. Planned uses include staking tally nodes and protocol governance. QRM is not an investment contract, security, or claim on revenue of any entity.",
       "Acquiring, holding, or staking QRM may be restricted in your jurisdiction. You are responsible for compliance with applicable laws, including securities, tax, and sanctions regulations.",
     ],
   },
   {
     h: "5. Staking and Slashing",
     p: [
-      "Stakers and tally-node operators agree to the slashing conditions encoded in the staking program, including penalties for ballot leakage, censorship, false tally, and prolonged unavailability. Slashing is executed by the protocol and is irreversible.",
+      "Slashing is not implemented on devnet. Staked QRM can be unstaked at any time. If tally-node staking launches, its slashing conditions (for example ballot leakage, censorship, false tally or prolonged unavailability) will be published here before they apply.",
     ],
   },
   {

@@ -865,8 +865,8 @@
           <div class="marquee-content">
             <!-- Set 1 -->
             <span class="marquee-pill"><span class="dot"></span>Sealed Ballots</span>
-            <span class="marquee-pill"><span class="dot"></span>MPC Tally</span>
-            <span class="marquee-pill"><span class="dot"></span>TEE Execution</span>
+            <span class="marquee-pill"><span class="dot"></span>Threshold Tally</span>
+            <span class="marquee-pill"><span class="dot"></span>DLEQ-Verified Totals</span>
             <span class="marquee-pill"><span class="dot"></span>ZK Correctness</span>
             <span class="marquee-pill"><span class="dot"></span>Hidden Proposals</span>
             <span class="marquee-pill"><span class="dot"></span>Confidential Treasury</span>
@@ -876,8 +876,8 @@
             <span class="marquee-pill"><span class="dot"></span>Realms Integration</span>
             <!-- Set 2 -->
             <span class="marquee-pill"><span class="dot"></span>Sealed Ballots</span>
-            <span class="marquee-pill"><span class="dot"></span>MPC Tally</span>
-            <span class="marquee-pill"><span class="dot"></span>TEE Execution</span>
+            <span class="marquee-pill"><span class="dot"></span>Threshold Tally</span>
+            <span class="marquee-pill"><span class="dot"></span>DLEQ-Verified Totals</span>
             <span class="marquee-pill"><span class="dot"></span>ZK Correctness</span>
             <span class="marquee-pill"><span class="dot"></span>Hidden Proposals</span>
             <span class="marquee-pill"><span class="dot"></span>Confidential Treasury</span>
@@ -916,7 +916,7 @@
         <div class="kicker">[ Architecture · 003 ]</div>
         <h3 class="feature-title animated-title flow-title" style="white-space: normal;">Four composable modules.<br><span style="font-weight: 500;">One confidential stack.</span></h3>
         <div class="qrm-tiles">
-          <div class="qrm-tile"><div class="num">Module I</div><div class="name">Sealed-Ballot Voting</div><div class="desc">Threshold-encrypted ballots, MPC/TEE tally, ZK proof of correctness. Receipt-free by construction.</div></div>
+          <div class="qrm-tile"><div class="num">Module I</div><div class="name">Sealed-Ballot Voting</div><div class="desc">Threshold-encrypted ballots, publicly verifiable tally (DLEQ proofs), ZK eligibility. Receipt-free by construction.</div></div>
           <div class="qrm-tile"><div class="num">Module II</div><div class="name">Hidden-Until-Execution Proposals</div><div class="desc">Encrypted payloads with public rules. Reveal on-pass or via timelock — no front-running window.</div></div>
           <div class="qrm-tile"><div class="num">Module III</div><div class="name">Confidential Treasury</div><div class="desc">Token-2022 Confidential Balances. Auditor keys for selective disclosure. Solvency proofs without exposure.</div></div>
           <div class="qrm-tile"><div class="num">Module IV</div><div class="name">Private Delegation + Eligibility</div><div class="desc">Prove voting weight without revealing balance. Nullifiers prevent double-voting; identities stay private.</div></div>
@@ -931,9 +931,9 @@
           <div class="qrm-step"><div class="n">01</div><div class="t">Prove eligibility</div><div class="d">ZK proof of voting rights and weight — no balance exposed.</div></div>
           <div class="qrm-step"><div class="n">02</div><div class="t">Encrypt ballot</div><div class="d">Threshold encryption client-side. No plaintext leaves the browser.</div></div>
           <div class="qrm-step"><div class="n">03</div><div class="t">Cast sealed</div><div class="d">Submit as on-chain commitment. Nullifier blocks double-votes.</div></div>
-          <div class="qrm-step"><div class="n">04</div><div class="t">MPC / TEE tally</div><div class="d">Confidential aggregation. No single party can decrypt a ballot.</div></div>
+          <div class="qrm-step"><div class="n">04</div><div class="t">Threshold tally</div><div class="d">Only the totals are decrypted, with a 3-of-5 key. On devnet all five shares sit on one server; independent tally nodes are planned.</div></div>
           <div class="qrm-step"><div class="n">05</div><div class="t">ZK correctness proof</div><div class="d">Proves the result is the honest count of exactly the eligible votes.</div></div>
-          <div class="qrm-step"><div class="n">06</div><div class="t">Execute on-chain</div><div class="d">Solana verifies proof + attestation before the result can act.</div></div>
+          <div class="qrm-step"><div class="n">06</div><div class="t">Execute on-chain</div><div class="d">Eligibility root and result hash are anchored on Solana; anyone can re-verify the tally.</div></div>
         </div>
       </section>
 
@@ -941,13 +941,14 @@
       <section class="qrm-section" id="roles">
         <div class="kicker">[ Network · 005 ]</div>
         <h3 class="feature-title animated-title flow-title" style="white-space: normal;">A role for everyone.<br><span style="font-weight: 500;">Not just DAOs.</span></h3>
+        <p style="opacity:.7;font-size:.9rem;margin:-.5rem 0 1.5rem;">Planned network design. On devnet today, no role earns fees, rewards or revenue.</p>
         <div class="qrm-roles">
           <div class="qrm-role"><span class="who">DAO / Org</span><span class="what">Adopt QUORUM for confidential voting and treasury.</span><span class="earn">Pays per-vote fees</span></div>
-          <div class="qrm-role"><span class="who">Tally-node operator</span><span class="what">Stake QRM and run an MPC/TEE node that counts sealed votes.</span><span class="earn">Per-vote tally fees</span></div>
+          <div class="qrm-role"><span class="who">Tally-node operator</span><span class="what">Stake QRM and run a tally node that holds one key share (planned).</span><span class="earn">Per-vote tally fees</span></div>
           <div class="qrm-role"><span class="who">Proof verifier</span><span class="what">Stake QRM to independently re-verify tally correctness proofs.</span><span class="earn">Integrity fees</span></div>
-          <div class="qrm-role"><span class="who">QRM staker</span><span class="what">Stake without a node to secure the network and govern QUORUM.</span><span class="earn">USDC revenue share</span></div>
-          <div class="qrm-role"><span class="who">Delegate</span><span class="what">Accept private delegated voting weight and vote thoughtfully.</span><span class="earn">Delegation rewards</span></div>
-          <div class="qrm-role"><span class="who">Integration builder</span><span class="what">Build QUORUM into wallets, Realms, and DAO tooling.</span><span class="earn">Grants + share</span></div>
+          <div class="qrm-role"><span class="who">QRM staker</span><span class="what">Stake without a node to secure the network and govern QUORUM.</span><span class="earn">Governance voice</span></div>
+          <div class="qrm-role"><span class="who">Delegate</span><span class="what">Accept private delegated voting weight and vote thoughtfully.</span><span class="earn">Voting weight</span></div>
+          <div class="qrm-role"><span class="who">Integration builder</span><span class="what">Build QUORUM into wallets, Realms, and DAO tooling.</span><span class="earn">Grants</span></div>
         </div>
       </section>
 
@@ -955,13 +956,12 @@
       <section class="qrm-section" id="qrm">
         <div class="kicker">[ Token · 006 ]</div>
         <h3 class="feature-title animated-title flow-title" style="white-space: normal;">QRM powers<br><span style="font-weight: 500;">the confidential ballot box.</span></h3>
+        <p style="opacity:.7;font-size:.9rem;margin:-.5rem 0 1.5rem;">Planned utility. QRM is a devnet test token today: it pays no yield, fees or revenue, and staking only gates voting eligibility.</p>
         <div class="qrm-utils">
           <div class="qrm-util"><div class="lbl">Governance-as-a-Service</div><div class="val">DAOs pay QRM (or USDC) per confidential vote and treasury operation.</div></div>
-          <div class="qrm-util"><div class="lbl">Tally-node staking</div><div class="val">Stake to run MPC/TEE nodes. Earn fees. Slashed for misbehavior.</div></div>
+          <div class="qrm-util"><div class="lbl">Tally-node staking</div><div class="val">Stake to run a tally node that holds a key share; misbehavior is slashed (planned).</div></div>
           <div class="qrm-util"><div class="lbl">Fee discounts</div><div class="val">Stake QRM for reduced per-vote fees across adopters.</div></div>
           <div class="qrm-util"><div class="lbl">Protocol governance</div><div class="val">QUORUM's own parameters governed confidentially. Dogfood the stack.</div></div>
-          <div class="qrm-util"><div class="lbl">Revenue share</div><div class="val">60 / 20 / 10 / 10 — tally nodes, stakers, burn, treasury.</div></div>
-          <div class="qrm-util"><div class="lbl">Buyback &amp; burn</div><div class="val">A portion of every fee permanently removes QRM from supply.</div></div>
         </div>
       </section>
 
@@ -998,7 +998,7 @@
         <div class="kicker">[ Roadmap · 008 ]</div>
         <h3 class="feature-title animated-title flow-title" style="white-space: normal;">Sealed ballot first.<br><span style="font-weight: 500;">Everything compounds.</span></h3>
         <div class="qrm-roadmap">
-          <div class="qrm-phase"><div class="ph">Phase 1</div><div class="weeks">1–6</div><div class="focus">Sealed-ballot voting</div><div class="ms">Vote program, encrypted submission, MPC/TEE tally, ZK correctness, QRM token.</div></div>
+          <div class="qrm-phase"><div class="ph">Phase 1</div><div class="weeks">1–6</div><div class="focus">Sealed-ballot voting</div><div class="ms">Vote program, encrypted submission, threshold tally with DLEQ correctness proofs, QRM token.</div></div>
           <div class="qrm-phase"><div class="ph">Phase 2</div><div class="weeks">7–12</div><div class="focus">Hidden proposals + delegation</div><div class="ms">Hidden-until-execution, ZK eligibility, receipt-freeness hardening.</div></div>
           <div class="qrm-phase"><div class="ph">Phase 3</div><div class="weeks">13–18</div><div class="focus">Confidential treasury</div><div class="ms">Encrypted treasury, auditor-key disclosure, solvency proofs.</div></div>
           <div class="qrm-phase"><div class="ph">Phase 4</div><div class="weeks">19–24</div><div class="focus">Governance-as-a-Service</div><div class="ms">SDK, hosted app, Realms integration, staking network, first DAOs.</div></div>
