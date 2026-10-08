@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-08 — Long-run invariants, X-ray, audit scope
+
+- Nightly CI runs the stake-vault invariant suite at ~105k random operations (push CI runs 450).
+- Sec3 X-ray static analysis on the Anchor program in CI (pinned image; fails on any finding).
+- `AUDIT-SCOPE.md` lists the in-scope files; audited commits are tagged `audit-YYYY-MM-DD`.
+
 ## 2026-10-07 — Test suite
 
 - Every server function now runs in tests against Postgres (the real migrations, in-process) and
