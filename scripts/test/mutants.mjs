@@ -38,6 +38,9 @@ const MUTANTS = [
   ["SIWS: message not domain-bound", "src/fn/auth.ts", "buildSignMessage(data.wallet, data.nonce, getRequestHost(), new Date(row.expires_at))", "buildSignMessage(data.wallet, data.nonce, \"quorum-airdrop.example\", new Date(row.expires_at))", js(["src/fn/auth.test.ts"])],
   ["groth16 (on-chain): public inputs not range-checked", `${RS}/groth16.rs`, "if pubs.iter().any(|p| *p >= R) {", "if pubs.iter().any(|p| *p >= R && false) {", rust],
   ["commit_ballots: any state", `${RS}/lib.rs`, "require!(v.status == STATUS_OPEN, QuorumError::BadState);", "", rust],
+  ["solvency: no check against the real treasury balance", A, `if (t.amount < threshold) throw new Error("INSOLVENT");`, "", js(["src/fn/admin.test.ts"])],
+  ["solvency: opening sealed to revoked auditors too", A, "select pubkey from auditor_keys where not revoked", "select pubkey from auditor_keys", js(["src/fn/admin.test.ts"])],
+  ["verify_solvency (on-chain): any signer", `${RS}/lib.rs`, "    #[account(address = QUORUM_AUTHORITY @ QuorumError::Unauthorized)]\n", "", rust],
   ["submit_tally: any signer", `${RS}/lib.rs`, "        require_keys_eq!(v.authority, ctx.accounts.authority.key(), QuorumError::Unauthorized);\n        require!(v.status == STATUS_TALLYING", "        require!(v.status == STATUS_TALLYING", rust],
 ];
 

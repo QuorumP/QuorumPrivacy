@@ -16,6 +16,8 @@ export default defineConfig({
   // Cloudflare default; applies on any build outside the Lovable sandbox (local/CI/Vercel).
   nitro: { preset: "vercel" },
   vite: {
+    // src/lib/zk/solvency.server.ts inlines these into the server bundle with `?inline`.
+    assetsInclude: ["**/public/zk/solvency.wasm", "**/public/zk/solvency.zkey"],
     resolve: {
       alias: [
         // @coral-xyz/anchor's ESM build (dist/esm/index.js) executes

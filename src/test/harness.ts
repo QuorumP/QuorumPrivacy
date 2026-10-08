@@ -30,13 +30,14 @@ export const newWallet = () => Array.from(randomBytes(44), (b) => B58[b % 58]).j
 type Pending = { to: string; amount: number; from: "supply" | "vault" };
 export const chain = {
   vault: 0,
+  treasury: 0n, // base units
   balances: new Map<string, number>(),
   pending: new Map<string, Pending>(),
   stakeTxs: new Map<string, { wallet: string; amount: number }>(), // browser-signed stakes
   confirm: "ok" as "ok" | "failed" | "timeout",
   sendThrows: false,
   reset() {
-    this.vault = 0; this.balances.clear(); this.pending.clear(); this.stakeTxs.clear();
+    this.vault = 0; this.treasury = 0n; this.balances.clear(); this.pending.clear(); this.stakeTxs.clear();
     this.confirm = "ok"; this.sendThrows = false;
   },
   bal(w: string) { return this.balances.get(w) ?? 0; },
@@ -80,6 +81,9 @@ export const fakeQrm = {
   async confirmStakeTransfer(sig: string, wallet: string) {
     const t = chain.stakeTxs.get(sig);
     return t && t.wallet === wallet ? t.amount : 0;
+  },
+  async treasuryBalance() {
+    return { account: "QRMtreasury", amount: chain.treasury, slot: 4242 };
   },
 };
 

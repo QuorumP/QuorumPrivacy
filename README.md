@@ -19,8 +19,8 @@
 QUORUM lets a DAO vote, propose, and manage a treasury without leaking the information that makes
 governance manipulable. Ballots are encrypted in the browser, eligibility is proven with zero
 knowledge, the running tally stays hidden until close, and the final result is verifiable by anyone.
-Proposals stay sealed until execution, so there is no front running window. Treasury records stay
-confidential, with solvency proven by range proof and selective disclosure to auditors.
+Proposals stay sealed until execution, so there is no front running window. Treasury solvency is
+proven by range proof against the real treasury account, with selective disclosure to auditors.
 
 **Live app:** https://quorumprivacy.com
 
@@ -30,7 +30,7 @@ confidential, with solvency proven by range proof and selective disclosure to au
 | :-- | :-- |
 | Sealed ballot voting | One hot ballots encrypted client side, ZK eligibility, threshold tally, verifiable correctness. |
 | Hidden proposals | Encrypted until execution, commit reveal, released on pass or after a timelock. |
-| Confidential treasury | Hidden balances, ZK solvency proofs, selective disclosure to auditors. |
+| Confidential treasury | ZK solvency proofs bound to the treasury account, selective disclosure to auditors. Confidential balances are planned. |
 | Members and delegation | Eligibility (registered identity + 100 QRM staked) frozen per vote as a ZK snapshot; delegation of voting weight. |
 | QRM staking | Real Token 2022 staking that settles on chain into a dedicated vault. |
 | Proofs and verification | A public surface where anyone can check eligibility, tally and solvency proofs. |
@@ -51,8 +51,12 @@ can verify that the announced totals are the honest decryption of the sealed bal
 ciphertext and the commitment reach the server. The author reveals later, and the server checks the
 plaintext against the commitment. Reveal is either on pass or after a timelock.
 
-**Confidential treasury.** Solvency is proven with a Groth16 range proof: the operator proves reserves
-meet a public threshold while the balance stays hidden, and the proof is verified on chain. Individual
+**Confidential treasury.** Solvency is proven with a Groth16 range proof over the real treasury account
+(`8EgMeBoKGRdk34YfpCUuW9xwXtgg6wbmfr6hx4sVDvGt`): the server reads its balance from chain at a finalized slot and proves it meets a
+public threshold, so no one types the balance in. The app publishes the proof, threshold, account and
+slot but not the balance; the commitment's opening is sealed to each active auditor key. The program
+verifies the proof on chain and only accepts it from the server's authority key. On devnet the account
+is a plain Token-2022 account, so its balance is still readable on chain; confidential balances are planned. Individual
 records are disclosed to a chosen auditor with ECIES over Ristretto255, so only that auditor can read
 them.
 
@@ -85,7 +89,7 @@ QUORUM is designed to fail closed.
 | No double voting | One write-once identity per wallet, a unique nullifier per vote, and an eligible set frozen at vote creation. |
 | Tally correctness | Chaum Pedersen DLEQ proofs make the totals verifiable by anyone. |
 | No live tally | The running result is hidden until close, which defeats whale following. |
-| Solvency without exposure | A range proof proves reserves meet a threshold while the balance stays hidden. |
+| Solvency without exposure | A range proof shows the treasury account's on-chain balance meets a threshold without the app publishing it (on devnet it is still readable on chain). |
 | Fails closed | An invalid proof or malformed ballot is rejected and never stored. |
 
 ### Trust assumptions (devnet)

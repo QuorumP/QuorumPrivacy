@@ -255,7 +255,8 @@
       "accounts": [
         {
           "name": "authority",
-          "signer": true
+          "signer": true,
+          "address": "9sjBajqChwe1BDCa9gxAG46qgJzMwgKPe1mi64T24ZYC"
         }
       ],
       "args": [

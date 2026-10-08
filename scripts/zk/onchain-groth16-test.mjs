@@ -1,7 +1,7 @@
 // Submits a REAL snarkjs solvency proof to the deployed on-chain `verify_solvency` instruction
-// on devnet (alt_bn128 pairing in the quorum_anchor program). Signed by the funded test wallet
-// (the instruction is stateless + anti-spam only, so any signer works). Mirrors
-// src/lib/solana/groth16.server.ts exactly. Also runs a negative test (tampered proof → tx fails).
+// on devnet (alt_bn128 pairing in the quorum_anchor program), signed by the authority — the only
+// key the instruction accepts. Mirrors src/lib/solana/groth16.server.ts exactly. Negative tests:
+// a tampered proof fails, and a valid proof signed by any other key is refused (Unauthorized).
 import {
   Connection, Keypair, PublicKey, TransactionInstruction, Transaction, ComputeBudgetProgram,
   sendAndConfirmTransaction,
@@ -23,29 +23,28 @@ const g1neg = (p) => Buffer.concat([be32(p[0]), be32(((P - (BigInt(p[1]) % P)) %
 const g2 = (p) => Buffer.concat([be32(p[0][1]), be32(p[0][0]), be32(p[1][1]), be32(p[1][0])]);
 const DISCRIMINATOR = createHash("sha256").update("global:verify_solvency").digest().subarray(0, 8);
 
-// any funded devnet key works; the test wallet if present, else the authority
-const keyFile = [`${ROOT}/.devnet/test-wallet.json`, `${ROOT}/.devnet/qrm-authority.json`].find(existsSync);
-const signer = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(readFileSync(keyFile))));
+const signer = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(readFileSync(`${ROOT}/.devnet/qrm-authority.json`))));
 const conn = new Connection(RPC, "confirmed");
 console.log("program:", PROGRAM_ID.toBase58());
 console.log("signer :", signer.publicKey.toBase58());
 
-function buildIx(proof, publicSignals) {
+function buildIx(proof, publicSignals, by = signer) {
   const data = Buffer.concat([
     DISCRIMINATOR, g1neg(proof.pi_a), g2(proof.pi_b), g1(proof.pi_c),
     be32(publicSignals[0]), be32(publicSignals[1]),
   ]);
   return new TransactionInstruction({
     programId: PROGRAM_ID,
-    keys: [{ pubkey: signer.publicKey, isSigner: true, isWritable: false }],
+    keys: [{ pubkey: by.publicKey, isSigner: true, isWritable: false }],
     data,
   });
 }
-async function send(proof, publicSignals) {
+// `by` signs the instruction; the authority always pays the fee, so `by` needs no SOL.
+async function send(proof, publicSignals, by = signer) {
   const tx = new Transaction()
     .add(ComputeBudgetProgram.setComputeUnitLimit({ units: 1_400_000 }))
-    .add(buildIx(proof, publicSignals));
-  return sendAndConfirmTransaction(conn, tx, [signer], { commitment: "confirmed" });
+    .add(buildIx(proof, publicSignals, by));
+  return sendAndConfirmTransaction(conn, tx, by === signer ? [signer] : [signer, by], { commitment: "confirmed" });
 }
 
 // real proof: balance 5M >= threshold 1M
@@ -74,6 +73,16 @@ try {
   process.exit(1);
 } catch {
   console.log("  ✓ tampered proof REJECTED on-chain (pairing check fails → tx errors)");
+}
+console.log("\n[on-chain #3] VALID proof signed by another key → expect Unauthorized");
+try {
+  const sig = await send(proof, publicSignals, Keypair.generate());
+  console.log("  ✗ non-authority proof was ACCEPTED tx:", sig);
+  process.exit(1);
+} catch (e) {
+  const why = `${e?.message} ${(e?.logs ?? e?.transactionLogs ?? []).join(" ")}`;
+  if (!/0x1771|Unauthorized/.test(why)) { console.log("  ✗ failed for another reason:", why); process.exit(1); }
+  console.log("  ✓ non-authority REJECTED (Unauthorized)");
 }
 console.log("\n[on-chain] deployed Groth16 verifier: PASS");
 process.exit(0); // the RPC client keeps sockets open

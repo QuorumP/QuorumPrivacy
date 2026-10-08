@@ -6,13 +6,21 @@ include "circomlib/circuits/bitify.circom";
 // Proves the treasury is solvent — balance >= threshold — without revealing the balance.
 //  private: balance, blinding
 //  public:  threshold, commitment (= Poseidon(balance, blinding))
-// balance − threshold is constrained to a 64-bit non-negative range; if balance < threshold
-// the difference wraps mod p and cannot fit 64 bits, so the proof fails.
+// balance and threshold are each constrained to 64 bits (a u64 token amount), so neither can be
+// a field-"negative" value. With both in [0, 2^64), balance − threshold fits 64 bits iff
+// balance >= threshold; otherwise it wraps mod p and the proof fails.
+// The balance is bound to the real treasury account by the server, which reads it from chain
+// and generates this proof itself (src/lib/zk/solvency.server.ts).
 template Solvency() {
     signal input balance;
     signal input blinding;
     signal input threshold;
     signal input commitment;
+
+    component balanceBits = Num2Bits(64);
+    balanceBits.in <== balance;
+    component thresholdBits = Num2Bits(64);
+    thresholdBits.in <== threshold;
 
     component c = Poseidon(2);
     c.inputs[0] <== balance;

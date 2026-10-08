@@ -137,10 +137,11 @@ fn verify_solvency_instruction() {
     let ix = |pub0: [u8; 32]| instruction::VerifySolvency {
         proof_a: tv::PROOF_A, proof_b: tv::PROOF_B, proof_c: tv::PROOF_C, threshold: pub0, commitment: tv::PUB1,
     }.data();
-    let who = Pubkey::new_unique();
-    run(vec![signer(who, true)], ix(tv::PUB0)).unwrap();
+    run(vec![signer(QUORUM_AUTHORITY, true)], ix(tv::PUB0)).unwrap();
     let mut bad = tv::PUB0;
     bad[31] ^= 1;
-    assert_eq!(run(vec![signer(who, true)], ix(bad)), Err(INVALID_PROOF));
-    assert_eq!(run(vec![signer(who, false)], ix(tv::PUB0)), Err(NOT_SIGNER));
+    assert_eq!(run(vec![signer(QUORUM_AUTHORITY, true)], ix(bad)), Err(INVALID_PROOF));
+    assert_eq!(run(vec![signer(QUORUM_AUTHORITY, false)], ix(tv::PUB0)), Err(NOT_SIGNER));
+    // a valid proof from any other signer is refused: only the server attests real balances
+    assert_eq!(run(vec![signer(Pubkey::new_unique(), true)], ix(tv::PUB0)), Err(UNAUTHORIZED));
 }

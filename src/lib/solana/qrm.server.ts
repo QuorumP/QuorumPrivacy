@@ -50,6 +50,20 @@ export function vaultAccount(): Promise<PublicKey> {
   return PublicKey.createWithSeed(authority().publicKey, VAULT_SEED, TOKEN_2022_PROGRAM_ID);
 }
 
+export const TREASURY_SEED = "qrm-treasury";
+
+/** The DAO treasury account (created once by scripts/token/create-treasury.mjs), derived like the vault. */
+export function treasuryAccount(): Promise<PublicKey> {
+  return PublicKey.createWithSeed(authority().publicKey, TREASURY_SEED, TOKEN_2022_PROGRAM_ID);
+}
+
+/** The treasury's exact on-chain balance in base units, at a finalized slot. */
+export async function treasuryBalance(): Promise<{ account: string; amount: bigint; slot: number }> {
+  const account = await treasuryAccount();
+  const res = await rpc().getTokenAccountBalance(account, "finalized");
+  return { account: account.toBase58(), amount: BigInt(res.value.amount), slot: res.context.slot };
+}
+
 /** Public context the browser needs to build a Token-2022 transfer to the vault. */
 export async function stakeContext() {
   return {

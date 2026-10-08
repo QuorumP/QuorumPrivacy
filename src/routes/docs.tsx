@@ -196,8 +196,8 @@ function DocsPage() {
               that makes governance manipulable. Ballots are encrypted in your browser, eligibility is
               proven with zero knowledge, the running tally stays hidden until close, and the final
               result is verifiable by anyone. Proposals stay sealed until execution, so there is no
-              front running window. Treasury records stay confidential, with solvency proven by range
-              proof and selective disclosure to auditors.
+              front running window. Treasury solvency is proven by range
+              proof against the real treasury account, with selective disclosure to auditors.
             </P>
             <P>The protocol is organized into modules, each backed by real cryptography rather than a placeholder:</P>
             <DefTable
@@ -205,7 +205,7 @@ function DocsPage() {
               rows={[
                 ["Voting", "Sealed ballots, ZK eligibility, threshold tally, verifiable correctness."],
                 ["Proposals", "Hidden until execution, commit reveal, on pass or timelock."],
-                ["Treasury", "Confidential balances, ZK solvency proofs, auditor disclosure."],
+                ["Treasury", "ZK solvency proofs bound to the treasury account, auditor disclosure. Confidential balances are planned."],
                 ["Members", "Eligibility snapshot and private delegation of voting weight."],
                 ["Staking", "Real Token 2022 QRM staking that settles on chain on devnet."],
                 ["Proofs", "A public surface where anyone verifies the protocol was honest."],
@@ -300,16 +300,16 @@ await revealProposal({ data: { proposalId, plaintext } }); // commit is verified
 
           <Section id="treasury" kicker="Module III" title="Confidential Treasury">
             <P>
-              Treasury holdings stay confidential while remaining accountable. Solvency is proven with a
-              zero knowledge range proof, and individual records can be disclosed to a chosen auditor
-              without exposing the rest of the treasury.
+              The treasury stays accountable without the app publishing its balance. Solvency is proven with a
+              zero knowledge range proof over the real treasury account, and individual records can be
+              disclosed to a chosen auditor without exposing the rest.
             </P>
-            <P><strong style={{ color: palette.gold }}>Solvency proofs.</strong> The operator enters the real reserve balance and a public threshold. The browser generates a Groth16 range proof that reserves are at least the threshold, and only the proof and a commitment leave. The balance stays hidden. The proof is also verified on chain by the program.</P>
+            <P><strong style={{ color: palette.gold }}>Solvency proofs.</strong> The operator picks a public threshold. The server reads the treasury account's balance from chain at a finalized slot and generates a Groth16 range proof that it is at least the threshold; nobody types the balance in. The app publishes the proof, the threshold, the account and the slot, but not the balance. The opening of the commitment is encrypted to every active auditor key, so an auditor can check it against the chain. The program verifies the proof on chain and accepts it only from the server's authority key. On devnet the treasury is a plain Token-2022 account, so its balance is still readable on chain; confidential balances are planned.</P>
             <P><strong style={{ color: palette.gold }}>Selective disclosure.</strong> A single record is encrypted to one auditor public key with ECIES over Ristretto255. Only the holder of that auditor secret can read it.</P>
             <DefTable
               head={["Server function", "Purpose"]}
               rows={[
-                ["recordSolvencyProof", "Store a ZK range proof of reserves, optionally verified on chain."],
+                ["recordSolvencyProof", "Prove the treasury account's on-chain balance meets a threshold, seal the opening to auditors, verify on chain."],
                 ["issueDisclosure", "Encrypt one record to an auditor public key (ECIES)."],
                 ["addAuditor, revokeAuditor", "Manage the auditor keys authorized for disclosure."],
               ]}
@@ -410,7 +410,7 @@ const { verified, totals } = verifyTally(transcript);`}</Code>
                 ["No double voting", "A unique nullifier per voter per vote, enforced in the database and at tally."],
                 ["Tally correctness", "Chaum Pedersen DLEQ proofs make the totals verifiable by anyone."],
                 ["No live tally", "The running result is hidden until close, which defeats whale following."],
-                ["Solvency without exposure", "A range proof shows a committed balance meets a threshold while the balance stays hidden. The commitment is not yet tied to the real treasury balance."],
+                ["Solvency without exposure", "A range proof shows the treasury account's on-chain balance meets a threshold without the app publishing it. On devnet the balance is still readable on chain."],
                 ["Fails closed", "An invalid proof is rejected; no valid proof means no execution."],
               ]}
             />

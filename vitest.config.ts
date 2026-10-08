@@ -3,6 +3,7 @@ import { defineConfig } from "vitest/config";
 // Isolated from the app's vite.config (TanStack plugins). Server functions run against PGlite
 // and a fake devnet wired up in src/test/setup.ts.
 export default defineConfig({
+  assetsInclude: ["**/public/zk/solvency.wasm", "**/public/zk/solvency.zkey"], // see vite.config.ts
   test: {
     include: ["src/**/*.test.ts"],
     environment: "node",
@@ -20,7 +21,7 @@ export default defineConfig({
         "src/lib/supabase/**", "src/lib/env.server.ts",
         // Browser-only code (wallet signing, in-browser proving) and UI error plumbing.
         "src/lib/solana/stake.browser.ts", "src/lib/solana/buffer-polyfill.ts", "src/lib/zk/prove.ts",
-        "src/lib/zk/solvency.ts", "src/lib/error-*.ts", "src/lib/lovable-error-reporting.ts", "src/lib/utils.ts",
+        "src/lib/error-*.ts", "src/lib/lovable-error-reporting.ts", "src/lib/utils.ts",
       ],
       reporter: ["text-summary", "text"],
       thresholds: { lines: 85, statements: 85, functions: 85, branches: 70 },

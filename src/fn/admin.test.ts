@@ -3,8 +3,8 @@
 import { describe, it, expect } from "vitest";
 import * as A from "./actions";
 import { eciesDecrypt } from "../lib/crypto/ecies";
-import { signIn, signOut, newWallet, outcome, sql, ADMIN } from "../test/harness";
-import { proveSolvency } from "../test/zk";
+import { signIn, signOut, newWallet, outcome, sql, chain, ADMIN } from "../test/harness";
+import { poseidon2 } from "poseidon-lite";
 import { createHash, randomBytes } from "node:crypto";
 
 // Each fn has its own input type; the matrix calls them uniformly.
@@ -17,7 +17,7 @@ const adminOnly: [string, Fn, unknown][] = [
   ["saveSettings", A.saveSettings, { quorumPct: 5, approvalPct: 60, votingWindowDays: 3 }],
   ["setRealms", A.setRealms, { enabled: false }],
   ["issueDisclosure", A.issueDisclosure, { recordId: "R-1", auditorPubkey: hex64(), content: "x" }],
-  ["recordSolvencyProof", A.recordSolvencyProof, { threshold: "1", commitment: "1", proof: {}, publicSignals: ["1", "1"] }],
+  ["recordSolvencyProof", A.recordSolvencyProof, { threshold: "1" }],
   ["addAuditor", A.addAuditor, { label: "a" }],
   ["revokeAuditor", A.revokeAuditor, { pubkey: "p" }],
 ];
@@ -138,16 +138,32 @@ describe("confidential treasury", () => {
     expect(n).toBe(0); // the secret is never stored
   });
 
-  it("solvency proofs: valid ones record, mismatched or forged ones don't", async () => {
+  it("solvency proofs are bound to the real treasury balance and open only to active auditors", async () => {
     signIn(ADMIN);
-    const p = await proveSolvency(1_000_000n, 750_000n);
-    const base = { threshold: "750000", commitment: p.commitment, proof: p.proof, publicSignals: p.publicSignals };
-    await expect(A.recordSolvencyProof({ data: base })).resolves.toMatchObject({ threshold: "750000" });
-    // claim a higher threshold than the proof covers
-    expect(await outcome(A.recordSolvencyProof({ data: { ...base, threshold: "2000000" } }))).toBe("SIGNAL_MISMATCH");
-    expect(await outcome(A.recordSolvencyProof({ data: { ...base, threshold: "2000000", publicSignals: ["2000000", p.commitment] } }))).toBe("BAD_PROOF");
-    expect(await outcome(A.recordSolvencyProof({ data: { ...base, proof: {} } }))).toBe("BAD_PROOF");
-    await expect(proveSolvency(10n, 11n)).rejects.toThrow(); // insolvent: no proof exists
+    const auditor = await A.addAuditor({ data: { label: "Reserves" } });
+    chain.treasury = 1_000_000n * 10n ** 9n; // 1M QRM on chain
+    const r = await A.recordSolvencyProof({ data: { threshold: "750000" } });
+    expect(r).toMatchObject({ threshold: "750000", account: "QRMtreasury", slot: 4242 });
+
+    const [row] = await sql<{ commitment: string; account: string; slot: string; enc_balance: string }>(
+      `select commitment, account, slot::text, enc_balance from treasury_records where record_id=$1`, [r.recordId]);
+    expect(row).toMatchObject({ commitment: r.commitment, account: "QRMtreasury", slot: "4242" });
+    expect(row.enc_balance).not.toContain(chain.treasury.toString()); // sealed, never in the clear
+    // the auditor opens the commitment and it is the chain balance
+    const sealed = JSON.parse(row.enc_balance) as { pubkey: string; ct: string }[];
+    const o = JSON.parse(await eciesDecrypt(auditor.secret, sealed.find((x) => x.pubkey === auditor.pubkey)!.ct));
+    expect(o).toMatchObject({ account: "QRMtreasury", slot: 4242, amount: chain.treasury.toString() });
+    expect(poseidon2([BigInt(o.amount), BigInt(o.blinding)]).toString()).toBe(r.commitment);
+    const revoked = (await sql<{ pubkey: string }>(`select pubkey from auditor_keys where revoked`)).map((k) => k.pubkey);
+    expect(revoked.length).toBeGreaterThan(0);
+    expect(sealed.filter((x) => revoked.includes(x.pubkey))).toEqual([]);
+
+    // a threshold above the real balance can't be proven, whatever the admin claims
+    expect(await outcome(A.recordSolvencyProof({ data: { threshold: "1000001" } }))).toBe("INSOLVENT");
+    expect(await outcome(A.recordSolvencyProof({ data: { threshold: "99999999999" } }))).toBe("THRESHOLD_TOO_LARGE");
+    expect(await outcome(A.recordSolvencyProof({ data: { threshold: "-1" } }))).toBe("INVALID_INPUT");
+    const [{ n }] = await sql<{ n: number }>(`select count(*)::int n from treasury_records where kind='solvency'`);
+    expect(n).toBe(1);
   });
 });
 

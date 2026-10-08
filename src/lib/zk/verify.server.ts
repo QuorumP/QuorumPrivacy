@@ -23,7 +23,7 @@ export type Groth16Proof = {
 // Worker) and stash it on globalThis.curve_bn128, which ffjavascript's buildBn128 returns directly
 // on later calls — so verify never touches worker_threads. Memoized; safe in Node too.
 let bn128Ready: Promise<void> | null = null;
-function ensureBn128(): Promise<void> {
+export function ensureBn128(): Promise<void> {
   if (!bn128Ready) {
     bn128Ready = (async () => {
       const g = globalThis as { curve_bn128?: unknown };

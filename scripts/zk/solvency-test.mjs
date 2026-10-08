@@ -25,4 +25,15 @@ try {
 } catch { insolventRejected = true; }
 console.log("insolvent rejected:", insolventRejected ? "YES ✓" : "NO ✗");
 
-process.exit(v1 && insolventRejected ? 0 : 1);
+// Field wraparound: without 64-bit range checks on the inputs, a "negative" balance (p-1) with
+// threshold p-5 gives diff = 4, and a "negative" threshold (p-1) makes any balance pass.
+const P = 21888242871839275222246405745257275088548364400416034343698204186575808495617n;
+const rejects = async (b, t) => { try { await prove(b, t); return false; } catch { return true; } };
+const negBalance = await rejects(P - 1n, P - 5n);
+const negThreshold = await rejects(10n, P - 1n);
+const over64 = await rejects(1n << 64n, 1n);
+console.log("field-negative balance rejected:", negBalance ? "YES ✓" : "NO ✗");
+console.log("field-negative threshold rejected:", negThreshold ? "YES ✓" : "NO ✗");
+console.log("balance >= 2^64 rejected:", over64 ? "YES ✓" : "NO ✗");
+
+process.exit(v1 && insolventRejected && negBalance && negThreshold && over64 ? 0 : 1);

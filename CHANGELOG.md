@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-10-08 — Solvency proofs bound to the real treasury
+
+- Solvency proofs are now made over a real treasury account (`8EgMeBoKGRdk34YfpCUuW9xwXtgg6wbmfr6hx4sVDvGt`).
+  The admin picks only a threshold; the server reads the account's balance from chain at a finalized
+  slot and generates the proof. Before, the operator typed the balance in, so any number could be proven.
+- The circuit range-checks `balance` and `threshold` to 64 bits. Before, a field-"negative" balance or
+  threshold could pass. New proving and verifying keys.
+- The commitment's opening (balance, blinding, slot) is sealed to every active auditor key.
+- On chain, `verify_solvency` now only accepts the authority key. Program redeployed to devnet.
+- Dashboard copy no longer claims Token-2022 Confidential Balances; on devnet the treasury balance is
+  still readable on chain.
+
 ## 2026-10-08 — Long-run invariants, X-ray, audit scope
 
 - Nightly CI runs the stake-vault invariant suite at ~105k random operations (push CI runs 450).

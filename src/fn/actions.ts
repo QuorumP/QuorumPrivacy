@@ -16,7 +16,8 @@ import { tallyBallots, tallyConfigured, tallyCorrectnessTranscript, verifyTransc
 import { anchorConfigured, registerVoteOnChain, anchorTallyOnChain } from "../lib/solana/anchor.server";
 import { rateLimit } from "../lib/security/rateLimit.server";
 import { auditorKeypair, eciesEncrypt } from "../lib/crypto/ecies";
-import { qrmConfigured, transferFromAuthority, sendFromAuthority, confirmSig, confirmStakeTransfer } from "../lib/solana/qrm.server";
+import { qrmConfigured, transferFromAuthority, sendFromAuthority, confirmSig, confirmStakeTransfer, treasuryBalance } from "../lib/solana/qrm.server";
+import { proveSolvency } from "../lib/zk/solvency.server";
 import { groth16OnChainConfigured, verifySolvencyOnChain } from "../lib/solana/groth16.server";
 
 const FAUCET_QRM = 500;
@@ -449,50 +450,60 @@ export const issueDisclosure = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-// Record a ZK solvency proof (balance >= threshold, balance hidden). The proof is generated
-// in the operator's browser; the server verifies it before publishing — no balance is stored.
+// Record a ZK solvency proof: treasury balance >= threshold, balance not shown in the app.
+// The admin picks only the threshold. The server reads the treasury account's real balance from
+// chain at a finalized slot and generates the proof itself, so the commitment is bound to the
+// actual account (no typed-in balance). The opening (balance, blinding, slot) is encrypted to
+// every active auditor key so auditors can check the commitment against the chain.
+const QRM_BASE = 10n ** 9n;
+const U64_MAX = (1n << 64n) - 1n;
 export const recordSolvencyProof = createServerFn({ method: "POST" })
   .validator((d: unknown) =>
-    z.object({
-      threshold: z.string().regex(/^\d+$/),
-      commitment: z.string().regex(/^\d+$/),
-      proof: z.record(z.string(), z.unknown()),
-      publicSignals: z.array(z.string()).length(2),
-    }).parse(d),
+    z.object({ threshold: z.string().regex(/^\d{1,11}$/) }).parse(d), // whole QRM
   )
   .handler(async ({ data }) => {
     requireAdmin();
-    if (data.publicSignals[0] !== data.threshold || data.publicSignals[1] !== data.commitment) {
-      throw new Error("SIGNAL_MISMATCH");
-    }
-    const ok = await verifySolvency(data.proof, data.publicSignals);
-    if (!ok) throw new Error("BAD_PROOF");
+    if (!qrmConfigured()) throw new Error("QRM_NOT_CONFIGURED");
+    const threshold = BigInt(data.threshold) * QRM_BASE;
+    if (threshold > U64_MAX) throw new Error("THRESHOLD_TOO_LARGE");
+    const t = await treasuryBalance();
+    if (t.amount < threshold) throw new Error("INSOLVENT");
+
+    const p = await proveSolvency(t.amount, threshold);
+    if (!(await verifySolvency(p.proof, p.publicSignals))) throw new Error("BAD_PROOF");
 
     // Best-effort: also verify the proof ON-CHAIN via the deployed alt_bn128 Groth16 verifier
-    // (devnet). Non-fatal — the off-chain verify already gates recording.
+    // (devnet, authority-gated). Non-fatal — the off-chain verify already gates recording.
     let onChainTx: string | null = null;
     if (groth16OnChainConfigured()) {
       try {
         onChainTx = await verifySolvencyOnChain(
-          data.proof as unknown as { pi_a: string[]; pi_b: string[][]; pi_c: string[] },
-          data.publicSignals,
+          p.proof as unknown as { pi_a: string[]; pi_b: string[][]; pi_c: string[] },
+          p.publicSignals,
         );
       } catch { /* keep the off-chain-verified record; on-chain attest can be retried */ }
     }
 
+    const opening = JSON.stringify({
+      account: t.account, slot: t.slot, amount: t.amount.toString(), blinding: p.blinding, commitment: p.commitment,
+    });
+    const auditors = await query<{ pubkey: string }>(`select pubkey from auditor_keys where not revoked`);
+    const sealed = await Promise.all(auditors.map(async (a) => ({ pubkey: a.pubkey, ct: await eciesEncrypt(a.pubkey, opening) })));
+
     const recordId = shortId("S-", 2);
     await query(
-      `insert into treasury_records (record_id, kind, commitment, solvency_proof_ref)
-       values ($1,'solvency',$2,$3)`,
-      [recordId, data.commitment, onChainTx ? `groth16:onchain:${onChainTx}` : "groth16"],
+      `insert into treasury_records (record_id, kind, commitment, solvency_proof_ref, account, slot, enc_balance)
+       values ($1,'solvency',$2,$3,$4,$5,$6)`,
+      [recordId, p.commitment, onChainTx ? `groth16:onchain:${onChainTx}` : "groth16", t.account, t.slot,
+       sealed.length ? JSON.stringify(sealed) : null],
     );
     await query(
       `insert into proofs (kind, ref_id, detail, proof_label, verified) values ('treasury',$1,$2,$3,true)`,
       [recordId,
-       `Solvency: reserves ≥ ${Number(data.threshold).toLocaleString()} (balance hidden)${onChainTx ? " · verified on-chain" : ""}`,
+       `Solvency: treasury ${t.account.slice(0, 6)}… ≥ ${Number(data.threshold).toLocaleString()} QRM at slot ${t.slot}${onChainTx ? " · verified on-chain" : ""}`,
        onChainTx ? "Valid · on-chain" : "Valid"],
     );
-    return { recordId, commitment: data.commitment, threshold: data.threshold, onChainTx };
+    return { recordId, commitment: p.commitment, threshold: data.threshold, account: t.account, slot: t.slot, onChainTx };
   });
 
 // ── Auditor keys ──────────────────────────────────────────────────────

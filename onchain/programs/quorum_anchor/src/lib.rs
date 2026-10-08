@@ -91,6 +91,9 @@ pub mod quorum_anchor {
 
 #[derive(Accounts)]
 pub struct VerifyProof<'info> {
+    // Only the server key may attest: it reads the real treasury balance and generates the proof
+    // itself, so a proof from any other signer would carry a self-chosen balance.
+    #[account(address = QUORUM_AUTHORITY @ QuorumError::Unauthorized)]
     pub authority: Signer<'info>,
 }
 

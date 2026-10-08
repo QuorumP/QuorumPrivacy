@@ -1263,7 +1263,6 @@ function TreasuryTab() {
   const { treasury, auditors } = Route.useLoaderData();
   const [solvencyOpen, setSolvencyOpen] = useState(false);
   const [solvencyInputOpen, setSolvencyInputOpen] = useState(false);
-  const [balanceInput, setBalanceInput] = useState("1250000");
   const [thresholdInput, setThresholdInput] = useState("1000000");
   const [proving, setProving] = useState(false);
   const [discloseOpen, setDiscloseOpen] = useState(false);
@@ -1272,37 +1271,32 @@ function TreasuryTab() {
   const [discloseContent, setDiscloseContent] = useState("");
   const [proofHash, setProofHash] = useState<string | null>(null);
   const [onChainTx, setOnChainTx] = useState<string | null>(null);
+  const [snapshot, setSnapshot] = useState<{ account: string; slot: number; threshold: string } | null>(null);
   const liveAuditors = auditors.filter((a) => !a.revoked && /^[0-9a-f]{64}$/.test(a.pubkey));
   const activeAuditors = auditors.filter((a) => !a.revoked).length;
 
   const authError = (e: unknown) =>
     toast.error((e as Error).message === "UNAUTHENTICATED" ? "Connect & sign in first." : (e as Error).message === "FORBIDDEN" ? "Admins only." : "Action failed.");
 
-  // Operator enters the real reserve balance + the threshold to prove; the ZK range proof is
-  // generated in-browser and only the proof + commitment leave — the balance stays hidden.
+  // The operator picks only the public threshold. The server reads the treasury account's real
+  // balance from chain and generates the proof itself, so the proof is bound to that account.
   const genSolvency = async () => {
-    let balance: bigint, threshold: bigint;
-    try {
-      balance = BigInt(balanceInput.replace(/[, ]/g, ""));
-      threshold = BigInt(thresholdInput.replace(/[, ]/g, ""));
-    } catch { toast.error("Enter whole numbers for balance and threshold."); return; }
-    if (balance < 0n || threshold < 0n) { toast.error("Values must be non-negative."); return; }
-    if (balance < threshold) { toast.error("Balance is below the threshold — solvency can't be proven."); return; }
+    const threshold = thresholdInput.replace(/[, ]/g, "");
+    if (!/^\d{1,11}$/.test(threshold)) { toast.error("Enter a whole number of QRM."); return; }
     setProving(true);
     try {
-      const { proveSolvency } = await import("@/lib/zk/solvency");
-      const { proof, publicSignals, commitment } = await proveSolvency(balance, threshold);
-      const res = await recordSolvencyProof({ data: { threshold: threshold.toString(), commitment, proof, publicSignals } });
-      setProofHash(`0x${BigInt(commitment).toString(16).slice(0, 10)}`);
+      const res = await recordSolvencyProof({ data: { threshold } });
+      setProofHash(`0x${BigInt(res.commitment).toString(16).slice(0, 10)}`);
       setOnChainTx(res.onChainTx ?? null);
+      setSnapshot({ account: res.account, slot: res.slot, threshold: res.threshold });
       setSolvencyInputOpen(false);
       setSolvencyOpen(true);
       await router.invalidate();
-      toast.success(res.onChainTx
-        ? `Solvency proven & verified on-chain — balance stays hidden.`
-        : `Solvency proven: reserves ≥ ${threshold.toLocaleString()} — balance stays hidden.`);
-    } catch (e) { authError(e); }
-    finally { setProving(false); }
+      toast.success(`Solvency proven: treasury ≥ ${Number(threshold).toLocaleString()} QRM${res.onChainTx ? " · verified on-chain" : ""}.`);
+    } catch (e) {
+      if ((e as Error).message === "INSOLVENT") toast.error("The treasury holds less than that — solvency can't be proven.");
+      else authError(e);
+    } finally { setProving(false); }
   };
 
   const disclose = async () => {
@@ -1324,7 +1318,7 @@ function TreasuryTab() {
         kicker="Module III · Confidential Treasury"
         title="Solvent."
         highlight="Confidential. Selectively disclosed."
-        desc="Treasury holdings and transfers are encrypted on-chain via Token-2022 Confidential Balances. An auditor key allows targeted disclosure to members or regulators without exposing the whole treasury."
+        desc="Solvency proofs are generated from the treasury account's real on-chain balance and shown here without the amount. On devnet the account is a plain Token-2022 account, so its balance is still readable on chain; confidential balances are planned. Auditor keys can open each proof and read selected records."
         cta="Generate Solvency Proof"
         onClick={() => setSolvencyInputOpen(true)}
       />
@@ -1336,7 +1330,7 @@ function TreasuryTab() {
       </div>
       <Panel title="Selective disclosure" subtitle="Auditor-key release" action={<button onClick={() => setDiscloseOpen(true)} style={btnStyle({ sm: true })}><Eye size={12} style={{ marginRight: 5 }} />Disclose Record</button>}>
         <div style={{ display: "grid", gap: "0.6rem", fontSize: "0.88rem" }}>
-          <KvRow k="Encrypted balance" v="•••••• (hidden by design)" />
+          <KvRow k="Treasury balance" v="not shown in the app (readable on chain on devnet)" />
           <KvRow k="Disclosures issued" v={String(treasury.disclosureCount)} />
           <KvRow k="Solvency proofs on file" v={String(treasury.solvencyCount)} highlight />
         </div>
@@ -1344,16 +1338,13 @@ function TreasuryTab() {
 
       <Modal open={solvencyInputOpen} onClose={() => setSolvencyInputOpen(false)} title="Prove solvency" kicker="Confidential Treasury">
         <div style={{ opacity: 0.7, fontSize: "0.88rem", marginBottom: "1rem" }}>
-          Enter the real reserve balance and the threshold to prove. A ZK range proof is generated
-          in your browser — only the proof + a commitment leave. The balance itself stays hidden.
+          Pick the threshold to prove. The server reads the treasury account's balance from chain and
+          generates a ZK range proof that it is at least this amount. The app publishes the proof, the
+          threshold and a commitment, not the balance. Active auditor keys can open the commitment.
         </div>
         <div style={{ display: "grid", gap: "0.6rem" }}>
           <label style={{ display: "grid", gap: "0.3rem" }}>
-            <span style={{ fontSize: "0.75rem", letterSpacing: "0.12em", textTransform: "uppercase", opacity: 0.6 }}>Reserve balance (hidden)</span>
-            <input style={inputStyle} type="number" min={0} value={balanceInput} onChange={(e) => setBalanceInput(e.target.value)} placeholder="e.g. 1250000" />
-          </label>
-          <label style={{ display: "grid", gap: "0.3rem" }}>
-            <span style={{ fontSize: "0.75rem", letterSpacing: "0.12em", textTransform: "uppercase", opacity: 0.6 }}>Prove reserves ≥ (public)</span>
+            <span style={{ fontSize: "0.75rem", letterSpacing: "0.12em", textTransform: "uppercase", opacity: 0.6 }}>Prove treasury ≥ (QRM, public)</span>
             <input style={inputStyle} type="number" min={0} value={thresholdInput} onChange={(e) => setThresholdInput(e.target.value)} placeholder="e.g. 1000000" />
           </label>
         </div>
@@ -1367,10 +1358,11 @@ function TreasuryTab() {
 
       <Modal open={solvencyOpen} onClose={() => setSolvencyOpen(false)} title="Solvency proof generated" kicker="Confidential Treasury">
         <div style={{ display: "grid", gap: "0.55rem", fontSize: "0.88rem" }}>
-          <KvRow k="Scheme" v="Range proof + Merkle commitment" />
-          <KvRow k="Proves" v="Treasury ≥ outstanding obligations" highlight />
-          <KvRow k="Disclosed" v="Nothing else" />
-          <KvRow k="Proof hash" v={proofHash ?? "0x3a…7c11"} />
+          <KvRow k="Scheme" v="Groth16 range proof + Poseidon commitment" />
+          <KvRow k="Proves" v={snapshot ? `Treasury ≥ ${Number(snapshot.threshold).toLocaleString()} QRM` : "—"} highlight />
+          <KvRow k="Treasury account" v={snapshot ? `${snapshot.account.slice(0, 6)}…${snapshot.account.slice(-6)}` : "—"} />
+          <KvRow k="Balance read at slot" v={snapshot ? snapshot.slot.toLocaleString() : "—"} />
+          <KvRow k="Commitment" v={proofHash ?? "—"} />
           {onChainTx
             ? <a href={explorerTx(onChainTx)} target="_blank" rel="noreferrer" style={{ color: palette.indigo, textDecoration: "none", display: "flex", justifyContent: "space-between" }}>
                 <span style={{ opacity: 0.65 }}>On-chain verify (devnet)</span><span>{onChainTx.slice(0, 6)}…{onChainTx.slice(-6)} ↗</span>

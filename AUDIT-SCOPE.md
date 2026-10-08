@@ -16,17 +16,17 @@ Everything that enforces a rule or holds funds.
 | Server functions (API surface) | `src/fn/actions.ts`, `src/fn/auth.ts`, `src/fn/data.ts`, `src/fn/zk.ts` |
 | Auth + sessions | `src/lib/auth/jwt.server.ts`, `src/lib/auth/session.server.ts` |
 | Ballot / tally crypto | `src/lib/crypto/elgamal.ts`, `threshold.ts`, `tally.server.ts`, `proposal.ts`, `ecies.ts` |
-| ZK verification + Merkle tree | `src/lib/zk/verify.server.ts`, `tree.server.ts`, `poseidon.ts` |
-| Token, staking, on-chain calls | `src/lib/solana/qrm.server.ts`, `anchor.server.ts`, `groth16.server.ts`, `idl.json` |
+| ZK proving/verification + Merkle tree | `src/lib/zk/verify.server.ts`, `solvency.server.ts`, `tree.server.ts`, `poseidon.ts` |
+| Token, staking, treasury, on-chain calls | `src/lib/solana/qrm.server.ts`, `anchor.server.ts`, `groth16.server.ts`, `idl.json` |
 | Rate limiting | `src/lib/security/rateLimit.server.ts` |
-| Database schema + RLS | `supabase/migrations/0001`–`0009` |
+| Database schema + RLS | `supabase/migrations/0001`–`0010` |
 | Config / env handling | `src/lib/env.server.ts`, `src/lib/db/pool.server.ts` |
 
 ## Out of scope
 
 - UI (`src/routes/`, `src/components/`), styling, marketing copy.
 - Browser-only helpers that hold no authority: `src/lib/solana/stake.browser.ts`, `src/lib/zk/prove.ts`,
-  `src/lib/zk/solvency.ts`, `src/lib/supabase/browser.ts`, error reporting, `src/lib/utils.ts`.
+  `src/lib/supabase/browser.ts`, error reporting, `src/lib/utils.ts`.
 - Tests (`**/*.test.ts`, `onchain/programs/quorum_anchor/src/tests.rs`, `test_vector.rs`) and `scripts/` —
   reviewed for correctness of the claims they back, not as attack surface.
 - Third-party dependencies beyond `cargo audit` / lockfile review.
