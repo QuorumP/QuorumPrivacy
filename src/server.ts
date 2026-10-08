@@ -40,6 +40,10 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      if (new URL(request.url).pathname === "/api/ops-status") {
+        const { opsStatus } = await import("./fn/data");
+        return Response.json(await opsStatus(), { headers: { "cache-control": "no-store" } });
+      }
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
       return await normalizeCatastrophicSsrResponse(response);

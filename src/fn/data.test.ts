@@ -2,7 +2,8 @@
 // disclosure ciphertexts, auditor secrets, or anyone's delegation.
 import { describe, it, expect, beforeAll } from "vitest";
 import * as D from "./data";
-import { signIn, signOut, newWallet, sql } from "../test/harness";
+import * as A from "./actions";
+import { signIn, signOut, newWallet, sql, ADMIN } from "../test/harness";
 
 const voter = newWallet(), delegate = newWallet(), author = newWallet();
 const SECRETS = {
@@ -55,5 +56,22 @@ describe("getParticipation", () => {
     await expect(D.getParticipation()).resolves.toMatchObject({ wallet: voter, eligible: true, registered: true, delegationTo: delegate, qrmStaked: 150 });
     signIn(delegate);
     await expect(D.getParticipation()).resolves.toMatchObject({ wallet: delegate, eligible: false, registered: false, qrmStaked: 0 });
+  });
+});
+
+describe("opsStatus (/api/ops-status, polled by the monitor)", () => {
+  it("shows pause flags and recent admin actions, never actors or values", async () => {
+    signIn(ADMIN);
+    const aud = await A.addAuditor({ data: { label: "Ops" } });
+    await A.setPause({ data: { faucet: true } });
+    try {
+      const s = await D.opsStatus();
+      expect(s).toMatchObject({ faucet_paused: true, tally_paused: false });
+      expect(s.admin_events.map((e) => e.action)).toEqual(expect.arrayContaining(["addAuditor", "setPause"]));
+      const text = JSON.stringify(s);
+      expect(text).not.toContain(ADMIN);
+      expect(text).not.toContain(aud.pubkey);
+    } finally { await A.setPause({ data: { faucet: false } }); }
+    expect((await D.opsStatus()).faucet_paused).toBe(false);
   });
 });

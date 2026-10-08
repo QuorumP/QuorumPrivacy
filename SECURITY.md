@@ -36,9 +36,13 @@ Every privileged power today, and who holds it.
 **Monitoring.** `.github/workflows/monitor.yml` runs `scripts/onchain/monitor.mjs` every hour (read-only). It
 fails, and GitHub notifies the repo owner, when: the post-deploy check fails (program hash, upgrade authority,
 any QRM mint/freeze/fee/metadata authority, or the vault/treasury accounts changed); the authority's SOL drops
-below 1 SOL; a single stake-vault outflow exceeds 10,000 QRM or outflows exceed 50,000 QRM in an hour; or the
-treasury sends anything at all. If the `ALERT_WEBHOOK_URL` secret is set, alerts are also posted there, and
-the server posts every pause switch to the same webhook (`ALERT_WEBHOOK_URL` in the app's environment).
+below 1 SOL; a single stake-vault or supply (faucet) outflow exceeds 10,000 QRM, or outflows exceed 50,000
+QRM in an hour; the treasury sends anything at all; the faucet or tally is paused; or an admin changed roles or
+settings (`addAuditor`, `revokeAuditor`, `setPause`, `saveSettings`, `setRealms`) in the last hour. Pause and
+admin-action state comes from the app's read-only `/api/ops-status` (flags and action names with times; no actors
+or values); if it is unreachable, that is an alert too. If the `ALERT_WEBHOOK_URL` secret is set, alerts are also
+posted there, and the server posts every pause switch to the same webhook (`ALERT_WEBHOOK_URL` in the app's
+environment). Changing `ADMIN_WALLETS` is a Vercel environment change and is not visible to the monitor.
 
 **Pausing.** Wallets in `ADMIN_WALLETS` can pause the faucet and the tally from the dashboard (Settings →
 Incident switches) or with `setPause`. Both return `PAUSED` while switched off. Unstaking has no switch by

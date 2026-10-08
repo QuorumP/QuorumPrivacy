@@ -157,3 +157,16 @@ export const getParticipation = createServerFn({ method: "GET" }).handler(async 
     qrmStaked: Number(stake?.total ?? 0),
   };
 });
+
+/**
+ * Public ops status for the hourly monitor (scripts/onchain/monitor.mjs), served at /api/ops-status:
+ * pause flags and the admin actions of the last `hours` — action and time only; actors and values
+ * stay in admin_events.
+ */
+export async function opsStatus(hours = 2) {
+  const s = await queryOne<{ faucet_paused: boolean; tally_paused: boolean }>(
+    `select faucet_paused, tally_paused from settings where dao='quorum'`);
+  const events = await query<{ action: string; at: string }>(
+    `select action, at from admin_events where at > now() - make_interval(hours => $1) order by id`, [hours]);
+  return { faucet_paused: !!s?.faucet_paused, tally_paused: !!s?.tally_paused, admin_events: events };
+}
