@@ -1,6 +1,6 @@
 # Audit scope
 
-**Audited version:** tag `audit-2026-10-08` (commit `2ccae37`, AI audit-grade rescore 9.1/10). Previous: `audit-2026-10-07` (`db8a57d`). Each new audit adds a tag `audit-YYYY-MM-DD`
+**Audited version:** tag `audit-2026-10-08.3` (commit `fdf1163`, AI audit-grade rescore 9.5/10). Earlier: `audit-2026-10-08` (`2ccae37`, 9.1), `audit-2026-10-07` (`db8a57d`, 7.0). Each new audit adds a tag `audit-YYYY-MM-DD`
 on the commit it reviewed; diff two tags to see what changed between audits.
 **Network:** Solana devnet only. Mainnet is out of scope until a separate external audit.
 

@@ -78,6 +78,9 @@ try {
   const res = await fetch(`${APP_URL}/api/ops-status`, { headers: { accept: "application/json" } });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const s = await res.json();
+  if (typeof s.faucet_paused !== "boolean" || typeof s.tally_paused !== "boolean" || !Array.isArray(s.admin_events)) {
+    throw new Error("unexpected response shape"); // never read a malformed status as "all clear"
+  }
   const since = Date.now() - LOOKBACK_MIN * 60_000;
   const recent = (s.admin_events ?? []).filter((e) => ALERT_ACTIONS.includes(e.action) && Date.parse(e.at) >= since);
   console.log(`app: faucet_paused=${s.faucet_paused} tally_paused=${s.tally_paused}, ${recent.length} role/settings change(s)`);
