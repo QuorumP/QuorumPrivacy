@@ -43,7 +43,8 @@ None of the following is optional. Mainnet is blocked until every item is done a
    shares from the app server.
 5. Run a multi-party trusted-setup ceremony for both circuits and publish the transcript.
 6. Disable the faucet.
-7. Build with `solana-verify build`, deploy that artifact, and publish its hash.
+7. ~~Build with `solana-verify build`, deploy that artifact, and publish its hash.~~ Done on devnet
+   (2026-10-08): see README "Build of record"; CI and `scripts/onchain/post-deploy-check.mjs` enforce it.
 8. Complete an external security audit.
 
 ## Trust assumptions and accepted risks (devnet)

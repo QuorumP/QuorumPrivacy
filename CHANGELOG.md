@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-10-08 — Verifiable program build
+
+- The live `quorum_anchor` program is now the `solana-verify build` of this source (pinned Docker image).
+  Its hash is in `onchain/BUILD_HASH` and the README shows how to reproduce it.
+- CI rebuilds it on every push and fails if the build, `BUILD_HASH` and the live program disagree.
+- `scripts/onchain/post-deploy-check.mjs` (read-only, also in CI) checks the program hash, the upgrade
+  and QRM mint/freeze/fee/metadata authorities, the vault and treasury accounts, and leftover buffers.
+- `scripts/onchain/deploy.mjs` no longer hard-codes a local path and only deploys the build of record.
+
 ## 2026-10-08 — Solvency proofs bound to the real treasury
 
 - Solvency proofs are now made over a real treasury account (`8EgMeBoKGRdk34YfpCUuW9xwXtgg6wbmfr6hx4sVDvGt`).

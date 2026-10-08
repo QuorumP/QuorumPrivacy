@@ -1,32 +1,40 @@
-// Deploy quorum_anchor to devnet (once the authority is funded). Verifies the result.
-// Run with: node scripts/onchain/deploy.mjs
-import { execSync } from "node:child_process";
-import { existsSync } from "node:fs";
-import { join } from "node:path";
-import { homedir } from "node:os";
+// Deploy (upgrade) quorum_anchor on devnet from the build of record, then run the read-only
+// post-deploy check. Refuses any .so whose hash isn't onchain/BUILD_HASH, so only the
+// solana-verify build (CI artifact "quorum_anchor-verifiable") can go live.
+//
+// Usage: node scripts/onchain/deploy.mjs [path/to/quorum_anchor.so]
+//   solana CLI: on PATH, or set SOLANA_BIN. Keys: .devnet/qrm-authority.json (upgrade authority
+//   + payer) and .devnet/quorum_anchor-keypair.json (program id).
+import { execFileSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { createHash } from "node:crypto";
 
 const root = process.cwd();
-const bin = join(homedir(), "solana", "solana-release", "bin");
-const solana = join(bin, "solana.exe");
-const so = join(root, "onchain", "target", "deploy", "quorum_anchor.so");
+const solana = process.env.SOLANA_BIN ?? "solana";
+const so = resolve(process.argv[2] ?? join(root, "onchain", "target", "deploy", "quorum_anchor.so"));
 const programKp = join(root, ".devnet", "quorum_anchor-keypair.json");
 const payer = join(root, ".devnet", "qrm-authority.json");
+// same as solana-verify get-executable-hash: sha256 with trailing zero bytes trimmed
+const programHash = (b) => { let e = b.length; while (e > 0 && b[e - 1] === 0) e--; return createHash("sha256").update(b.subarray(0, e)).digest("hex"); };
+const run = (args, opts = {}) => execFileSync(solana, args, { encoding: "utf8", ...opts });
 
-if (!existsSync(so)) { console.error("missing", so, "- run the build first"); process.exit(1); }
-
-const authority = execSync(`"${solana}" address -k "${payer}"`).toString().trim();
-const balance = execSync(`"${solana}" balance ${authority} --url devnet`).toString().trim();
-console.log("authority:", authority, "| balance:", balance);
-if (parseFloat(balance) < 2.4) {
-  console.error(`Need ~2.4 SOL to deploy; have ${balance}. Fund ${authority} via https://faucet.solana.com (Devnet) and re-run.`);
+if (!existsSync(so)) { console.error("missing", so); process.exit(1); }
+const bytes = readFileSync(so);
+const hash = programHash(bytes);
+const want = readFileSync(join(root, "onchain", "BUILD_HASH"), "utf8").trim();
+console.log("artifact:", so, "\nhash:    ", hash);
+if (hash !== want) {
+  console.error(`refusing: hash != onchain/BUILD_HASH (${want}). Deploy the CI verifiable build, or update BUILD_HASH on purpose.`);
   process.exit(1);
 }
 
+const authority = run(["address", "-k", payer]).trim();
+const sol = parseFloat(run(["balance", authority, "--url", "devnet"]));
+const need = (bytes.length * 2 * 6960) / 1e9 + 0.05; // buffer rent (refunded) + possible extend + fees
+console.log(`authority: ${authority} | balance: ${sol} SOL | need ~${need.toFixed(2)}`);
+if (sol < need) { console.error(`Fund ${authority} via https://faucet.solana.com (Devnet) and re-run.`); process.exit(1); }
+
 console.log("deploying…");
-execSync(
-  `"${solana}" program deploy "${so}" --program-id "${programKp}" --keypair "${payer}" --url devnet`,
-  { stdio: "inherit" },
-);
-console.log("\n=== program ===");
-execSync(`"${solana}" program show BHdjYZbXw6ay5qpGcrG3fGb4bmoAnZNKv3fKZ9Gxff6w --url devnet`, { stdio: "inherit" });
-console.log("explorer: https://explorer.solana.com/address/BHdjYZbXw6ay5qpGcrG3fGb4bmoAnZNKv3fKZ9Gxff6w?cluster=devnet");
+run(["program", "deploy", so, "--program-id", programKp, "--keypair", payer, "--url", "devnet"], { stdio: "inherit" });
+execFileSync(process.execPath, [join(root, "scripts", "onchain", "post-deploy-check.mjs")], { stdio: "inherit" });

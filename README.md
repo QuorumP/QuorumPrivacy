@@ -174,10 +174,29 @@ deploying, and again after migrating stakes (it only tops up the shortfall).
 | Program `quorum_anchor` | [`BHdjYZbXw6ay5qpGcrG3fGb4bmoAnZNKv3fKZ9Gxff6w`](https://explorer.solana.com/address/BHdjYZbXw6ay5qpGcrG3fGb4bmoAnZNKv3fKZ9Gxff6w?cluster=devnet) |
 | QRM mint (Token-2022) | [`HjQdV3YTpdJmThMuxe9Tvx8zJV9fHxZo5T3cA8Fhgvsw`](https://explorer.solana.com/address/HjQdV3YTpdJmThMuxe9Tvx8zJV9fHxZo5T3cA8Fhgvsw?cluster=devnet) |
 | Stake vault | [`DUbNMfraNdmo3R4L8Yfmhybw5pUmUcKUAGPnKZqw3jBz`](https://explorer.solana.com/address/DUbNMfraNdmo3R4L8Yfmhybw5pUmUcKUAGPnKZqw3jBz?cluster=devnet) |
+| Treasury (solvency proofs) | [`8EgMeBoKGRdk34YfpCUuW9xwXtgg6wbmfr6hx4sVDvGt`](https://explorer.solana.com/address/8EgMeBoKGRdk34YfpCUuW9xwXtgg6wbmfr6hx4sVDvGt?cluster=devnet) |
 | Upgrade / mint authority | [`9sjBajqChwe1BDCa9gxAG46qgJzMwgKPe1mi64T24ZYC`](https://explorer.solana.com/address/9sjBajqChwe1BDCa9gxAG46qgJzMwgKPe1mi64T24ZYC?cluster=devnet) |
 
-The deployed program binary was built locally, not with `solana-verify build`, so it is not yet
-reproducible from this source. A verifiable redeploy is on the mainnet checklist.
+**Build of record.** The live program is the `solana-verify build` of this source (Docker image
+`solanafoundation/solana-verifiable-build:4.1.0@sha256:6468b89a…`, solana-verify 0.5.2). Its hash is in
+[`onchain/BUILD_HASH`](onchain/BUILD_HASH):
+
+```
+45c1b0284bd4deb6d8dac3565132329baea4342f7c37ffeb9d84f2f20718052b
+```
+
+Reproduce it yourself:
+
+```bash
+cd onchain && solana-verify build --library-name quorum_anchor   --base-image solanafoundation/solana-verifiable-build:4.1.0@sha256:6468b89ae21d87b8eb002f894ac3f3442dbd8bcf5ea93414051e96e00d03b5ab
+solana-verify get-executable-hash target/deploy/quorum_anchor.so
+solana-verify get-program-hash -u devnet BHdjYZbXw6ay5qpGcrG3fGb4bmoAnZNKv3fKZ9Gxff6w
+```
+
+CI rebuilds it on every push and fails if the build, `BUILD_HASH` and the live program disagree.
+`node scripts/onchain/post-deploy-check.mjs` (read-only) also checks the upgrade and mint authorities,
+the vault and treasury accounts, and leftover deploy buffers. `scripts/onchain/deploy.mjs` only deploys a
+binary whose hash is `BUILD_HASH`.
 
 ## Project structure
 
