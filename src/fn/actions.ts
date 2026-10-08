@@ -167,6 +167,19 @@ export const revealProposal = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+// ── Admin audit trail + pause switches (migration 0011) ───────────────
+type Run = (text: string, params?: unknown[]) => Promise<unknown[]>;
+const json = (v: unknown) => (v === null || v === undefined ? null : JSON.stringify(v));
+/** Append one admin_events row (who, what, old → new). Call inside the change's transaction. */
+const adminEvent = (q: Run, actor: string, action: string, oldValue: unknown, newValue: unknown) =>
+  q(`insert into admin_events (actor, action, old_value, new_value) values ($1,$2,$3,$4)`,
+    [actor, action, json(oldValue), json(newValue)]);
+/** Throws PAUSED when an admin has paused this function. Only the faucet and the tally can be paused. */
+async function assertNotPaused(flag: "faucet_paused" | "tally_paused") {
+  const s = await queryOne<{ paused: boolean }>(`select ${flag} paused from settings where dao='quorum'`);
+  if (s?.paused) throw new Error("PAUSED");
+}
+
 // ── Create a vote (admin console) ─────────────────────────────────────
 export const createVote = createServerFn({ method: "POST" })
   .validator((d: unknown) =>
@@ -179,11 +192,14 @@ export const createVote = createServerFn({ method: "POST" })
     const closesAt = new Date(Date.now() + data.days * 86_400_000).toISOString();
     // freeze the eligibility set for this vote: root + the leaves to rebuild witnesses from
     const { root, leaves } = await eligibilityRoot();
-    await query(
-      `insert into votes (vote_id, title, status, opens_at, closes_at, created_by, eligibility_root, eligibility_leaves)
-       values ($1,$2,'open', now(), $3, $4, $5, $6)`,
-      [voteId, data.title, closesAt, wallet, root, JSON.stringify(leaves)],
-    );
+    await withTransaction(async (q) => {
+      await q(
+        `insert into votes (vote_id, title, status, opens_at, closes_at, created_by, eligibility_root, eligibility_leaves)
+         values ($1,$2,'open', now(), $3, $4, $5, $6)`,
+        [voteId, data.title, closesAt, wallet, root, JSON.stringify(leaves)],
+      );
+      await adminEvent(q, wallet, "createVote", null, { voteId, title: data.title, days: data.days });
+    });
     // best-effort: anchor the eligibility root on devnet (non-fatal if RPC/secret unavailable)
     let anchorTx: string | null = null;
     if (anchorConfigured()) {
@@ -202,6 +218,7 @@ export const runTally = createServerFn({ method: "POST" })
   .validator((d: unknown) => z.object({ voteId: z.string().min(1) }).parse(d))
   .handler(async ({ data }) => {
     const w = requireWallet();
+    await assertNotPaused("tally_paused");
     await rateLimit(`tally:${w}`, 10, 60);
     if (!tallyConfigured()) throw new Error("TALLY_NOT_CONFIGURED");
 
@@ -280,6 +297,7 @@ async function tallyClaimed(voteId: string) {
 // ── QRM faucet (devnet): authority sends the caller QRM so they can stake ──
 export const qrmFaucet = createServerFn({ method: "POST" }).handler(async () => {
   const wallet = requireWallet();
+  await assertNotPaused("faucet_paused");
   if (!qrmConfigured()) throw new Error("QRM_NOT_CONFIGURED");
   // Devnet-only, with a global daily budget on top of the per-wallet limit: fresh wallets are
   // free, so a per-wallet cap alone lets a script empty the supply.
@@ -390,11 +408,15 @@ export const saveSettings = createServerFn({ method: "POST" })
     }).parse(d),
   )
   .handler(async ({ data }) => {
-    requireAdmin();
-    await query(
-      `update settings set quorum_pct=$1, approval_pct=$2, voting_window_days=$3 where dao='quorum'`,
-      [data.quorumPct, data.approvalPct, data.votingWindowDays],
-    );
+    const admin = requireAdmin();
+    await withTransaction(async (q) => {
+      const [old] = await q(`select quorum_pct, approval_pct, voting_window_days from settings where dao='quorum' for update`);
+      await q(
+        `update settings set quorum_pct=$1, approval_pct=$2, voting_window_days=$3 where dao='quorum'`,
+        [data.quorumPct, data.approvalPct, data.votingWindowDays],
+      );
+      await adminEvent(q, admin, "saveSettings", old ?? null, data);
+    });
     return { ok: true };
   });
 
@@ -402,9 +424,43 @@ export const saveSettings = createServerFn({ method: "POST" })
 export const setRealms = createServerFn({ method: "POST" })
   .validator((d: unknown) => z.object({ enabled: z.boolean() }).parse(d))
   .handler(async ({ data }) => {
-    requireAdmin();
-    await query(`update settings set realms_enabled=$1 where dao='quorum'`, [data.enabled]);
+    const admin = requireAdmin();
+    await withTransaction(async (q) => {
+      const [old] = await q(`select realms_enabled from settings where dao='quorum' for update`);
+      await q(`update settings set realms_enabled=$1 where dao='quorum'`, [data.enabled]);
+      await adminEvent(q, admin, "setRealms", old ?? null, { realms_enabled: data.enabled });
+    });
     return { ok: true, enabled: data.enabled };
+  });
+
+// ── Pause switches (incident response) ────────────────────────────────
+// Only the faucet and the tally can be paused. Unstaking deliberately has no switch: members can
+// always take their stake back (studio rule P1). See SECURITY.md "Incident response".
+export const setPause = createServerFn({ method: "POST" })
+  .validator((d: unknown) => z.object({ faucet: z.boolean().optional(), tally: z.boolean().optional() }).parse(d))
+  .handler(async ({ data }) => {
+    const admin = requireAdmin();
+    const next = await withTransaction(async (q) => {
+      const [row] = (await q(`select faucet_paused, tally_paused from settings where dao='quorum' for update`)) as
+        { faucet_paused: boolean; tally_paused: boolean }[];
+      const old = row ?? { faucet_paused: false, tally_paused: false };
+      const next = { faucet_paused: data.faucet ?? old.faucet_paused, tally_paused: data.tally ?? old.tally_paused };
+      await q(
+        `insert into settings (dao, faucet_paused, tally_paused) values ('quorum',$1,$2)
+         on conflict (dao) do update set faucet_paused=excluded.faucet_paused, tally_paused=excluded.tally_paused`,
+        [next.faucet_paused, next.tally_paused],
+      );
+      await adminEvent(q, admin, "setPause", old, next);
+      return next;
+    });
+    // Best-effort ops alert (SECURITY.md "Incident response"); never blocks the switch.
+    const hook = process.env.ALERT_WEBHOOK_URL;
+    if (hook) {
+      const text = `QUORUM: ${admin} set faucet_paused=${next.faucet_paused}, tally_paused=${next.tally_paused}`;
+      await fetch(hook, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ content: text, text }) })
+        .catch(() => {});
+    }
+    return next;
   });
 
 // ── Private delegation (DB-tracked; on-chain settlement deferred) ──────
@@ -439,14 +495,18 @@ export const issueDisclosure = createServerFn({ method: "POST" })
     }).parse(d),
   )
   .handler(async ({ data }) => {
-    requireAdmin();
+    const admin = requireAdmin();
     const ciphertext = await eciesEncrypt(data.auditorPubkey, data.content);
-    await query(
-      `insert into treasury_records (record_id, kind, disclosed, disclosed_to, enc_balance)
-       values ($1,'disclosure',true,$2,$3)
-       on conflict (record_id) do update set disclosed=true, disclosed_to=excluded.disclosed_to, enc_balance=excluded.enc_balance`,
-      [data.recordId, data.auditorPubkey, ciphertext],
-    );
+    await withTransaction(async (q) => {
+      await q(
+        `insert into treasury_records (record_id, kind, disclosed, disclosed_to, enc_balance)
+         values ($1,'disclosure',true,$2,$3)
+         on conflict (record_id) do update set disclosed=true, disclosed_to=excluded.disclosed_to, enc_balance=excluded.enc_balance`,
+        [data.recordId, data.auditorPubkey, ciphertext],
+      );
+      // the disclosed content itself is never logged
+      await adminEvent(q, admin, "issueDisclosure", null, { recordId: data.recordId, auditorPubkey: data.auditorPubkey });
+    });
     return { ok: true };
   });
 
@@ -462,7 +522,7 @@ export const recordSolvencyProof = createServerFn({ method: "POST" })
     z.object({ threshold: z.string().regex(/^\d{1,11}$/) }).parse(d), // whole QRM
   )
   .handler(async ({ data }) => {
-    requireAdmin();
+    const admin = requireAdmin();
     if (!qrmConfigured()) throw new Error("QRM_NOT_CONFIGURED");
     const threshold = BigInt(data.threshold) * QRM_BASE;
     if (threshold > U64_MAX) throw new Error("THRESHOLD_TOO_LARGE");
@@ -491,18 +551,22 @@ export const recordSolvencyProof = createServerFn({ method: "POST" })
     const sealed = await Promise.all(auditors.map(async (a) => ({ pubkey: a.pubkey, ct: await eciesEncrypt(a.pubkey, opening) })));
 
     const recordId = shortId("S-", 2);
-    await query(
-      `insert into treasury_records (record_id, kind, commitment, solvency_proof_ref, account, slot, enc_balance)
-       values ($1,'solvency',$2,$3,$4,$5,$6)`,
-      [recordId, p.commitment, onChainTx ? `groth16:onchain:${onChainTx}` : "groth16", t.account, t.slot,
-       sealed.length ? JSON.stringify(sealed) : null],
-    );
-    await query(
-      `insert into proofs (kind, ref_id, detail, proof_label, verified) values ('treasury',$1,$2,$3,true)`,
-      [recordId,
-       `Solvency: treasury ${t.account.slice(0, 6)}… ≥ ${Number(data.threshold).toLocaleString()} QRM at slot ${t.slot}${onChainTx ? " · verified on-chain" : ""}`,
-       onChainTx ? "Valid · on-chain" : "Valid"],
-    );
+    await withTransaction(async (q) => {
+      await q(
+        `insert into treasury_records (record_id, kind, commitment, solvency_proof_ref, account, slot, enc_balance)
+         values ($1,'solvency',$2,$3,$4,$5,$6)`,
+        [recordId, p.commitment, onChainTx ? `groth16:onchain:${onChainTx}` : "groth16", t.account, t.slot,
+         sealed.length ? JSON.stringify(sealed) : null],
+      );
+      await q(
+        `insert into proofs (kind, ref_id, detail, proof_label, verified) values ('treasury',$1,$2,$3,true)`,
+        [recordId,
+         `Solvency: treasury ${t.account.slice(0, 6)}… ≥ ${Number(data.threshold).toLocaleString()} QRM at slot ${t.slot}${onChainTx ? " · verified on-chain" : ""}`,
+         onChainTx ? "Valid · on-chain" : "Valid"],
+      );
+      await adminEvent(q, admin, "recordSolvencyProof", null,
+        { recordId, threshold: data.threshold, account: t.account, slot: t.slot, onChainTx });
+    });
     return { recordId, commitment: p.commitment, threshold: data.threshold, account: t.account, slot: t.slot, onChainTx };
   });
 
@@ -510,20 +574,25 @@ export const recordSolvencyProof = createServerFn({ method: "POST" })
 export const addAuditor = createServerFn({ method: "POST" })
   .validator((d: unknown) => z.object({ label: z.string().min(1).max(80) }).parse(d))
   .handler(async ({ data }) => {
-    requireAdmin();
+    const admin = requireAdmin();
     // Real ECIES keypair: the auditor keeps `secret` (shown once); we store only the pubkey.
     const { pubkey, secret } = auditorKeypair();
-    await query(`insert into auditor_keys (label, pubkey, scope) values ($1,$2,'full')`, [
-      data.label, pubkey,
-    ]);
+    await withTransaction(async (q) => {
+      await q(`insert into auditor_keys (label, pubkey, scope) values ($1,$2,'full')`, [data.label, pubkey]);
+      await adminEvent(q, admin, "addAuditor", null, { label: data.label, pubkey });
+    });
     return { pubkey, secret };
   });
 
 export const revokeAuditor = createServerFn({ method: "POST" })
   .validator((d: unknown) => z.object({ pubkey: z.string().min(1) }).parse(d))
   .handler(async ({ data }) => {
-    requireAdmin();
-    await query(`update auditor_keys set revoked=true where pubkey=$1`, [data.pubkey]);
+    const admin = requireAdmin();
+    await withTransaction(async (q) => {
+      const [old] = await q(`select label, revoked from auditor_keys where pubkey=$1 for update`, [data.pubkey]);
+      await q(`update auditor_keys set revoked=true where pubkey=$1`, [data.pubkey]);
+      await adminEvent(q, admin, "revokeAuditor", old ?? null, { pubkey: data.pubkey, revoked: true });
+    });
     return { ok: true };
   });
 

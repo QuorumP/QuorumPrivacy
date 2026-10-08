@@ -40,6 +40,10 @@ const MUTANTS = [
   ["commit_ballots: any state", `${RS}/lib.rs`, "require!(v.status == STATUS_OPEN, QuorumError::BadState);", "", rust],
   ["solvency: no check against the real treasury balance", A, `if (t.amount < threshold) throw new Error("INSOLVENT");`, "", js(["src/fn/admin.test.ts"])],
   ["solvency: opening sealed to revoked auditors too", A, "select pubkey from auditor_keys where not revoked", "select pubkey from auditor_keys", js(["src/fn/admin.test.ts"])],
+  ["pause: faucet ignores the switch", A, `  await assertNotPaused("faucet_paused");\n`, "", js(["src/fn/stake.test.ts"])],
+  ["pause: tally ignores the switch", A, `    await assertNotPaused("tally_paused");\n`, "", js(["src/fn/stake.test.ts"])],
+  ["admin trail: setPause not logged", A, `await adminEvent(q, admin, "setPause", old, next);`, "", js(["src/fn/admin.test.ts"])],
+  ["admin trail: events can be rewritten", "supabase/migrations/0011_admin_events_pause.sql", "before update or delete or truncate on admin_events", "before truncate on admin_events", js(["src/fn/admin.test.ts"])],
   ["verify_solvency (on-chain): any signer", `${RS}/lib.rs`, "    #[account(address = QUORUM_AUTHORITY @ QuorumError::Unauthorized)]\n", "", rust],
   ["submit_tally: any signer", `${RS}/lib.rs`, "        require_keys_eq!(v.authority, ctx.accounts.authority.key(), QuorumError::Unauthorized);\n        require!(v.status == STATUS_TALLYING", "        require!(v.status == STATUS_TALLYING", rust],
 ];

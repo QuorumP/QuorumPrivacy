@@ -92,7 +92,8 @@ export const listAuditors = createServerFn({ method: "GET" }).handler(async () =
 export const getSettings = createServerFn({ method: "GET" }).handler(async () => {
   return queryOne<{
     quorum_pct: number; approval_pct: number; voting_window_days: number; realms_enabled: boolean;
-  }>(`select quorum_pct, approval_pct, voting_window_days, realms_enabled from settings where dao='quorum'`);
+    faucet_paused: boolean; tally_paused: boolean;
+  }>(`select quorum_pct, approval_pct, voting_window_days, realms_enabled, faucet_paused, tally_paused from settings where dao='quorum'`);
 });
 
 // Public on-chain context the browser needs to build a Token-2022 stake transfer to the vault.

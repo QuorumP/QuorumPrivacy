@@ -26,6 +26,8 @@ const checks = [
   ["col", "votes.tally_tx", await hasCol("votes", "tally_tx")],                     // 0004
   ["col", "votes.eligibility_root", await hasCol("votes", "eligibility_root")],
   ["col", "treasury_records.slot", await hasCol("treasury_records", "slot")],       // 0010
+  ["table", "admin_events", tables.includes("admin_events")],                       // 0011
+  ["col", "settings.faucet_paused", await hasCol("settings", "faucet_paused")],      // 0011
   ["seq", "members_leaf_seq", (await c.query(`select 1 from pg_class where relkind='S' and relname='members_leaf_seq'`)).rowCount > 0],
 ];
 async function hasCol(t, col) {

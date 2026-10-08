@@ -20,7 +20,7 @@ const SECTIONS: { h: string; p: string[] }[] = [
     h: "1. Our Privacy Principle",
     p: [
       "QUORUM exists to remove the show of hands from on-chain governance. Privacy is not a setting — it is the architecture.",
-      "Individual votes are sealed. Treasury balances are encrypted. Proposal payloads are hidden until execution. We design the Protocol so that there is, by construction, no plaintext governance data for QUORUM, validators, or any third party to collect.",
+      "Individual votes are sealed and proposal payloads are hidden until execution. On devnet today the threshold tally key's shares are all held by the operator's server, so the operator could technically decrypt an individual ballot; distributing those shares to independent operators is planned. The treasury is a regular Token-2022 account whose balance is public on chain.",
     ],
   },
   {
@@ -34,7 +34,7 @@ const SECTIONS: { h: string; p: string[] }[] = [
     h: "3. What Is Public On-Chain",
     p: [
       "By the nature of Solana, the following are public: your wallet address; the fact that an eligible wallet cast a ballot in a given vote (without the choice); aggregate vote results; QRM stake amounts; tally-node identities; published ZK proofs and attestations; confidential-treasury solvency proofs.",
-      "Confidential Treasury balances and transfer amounts are encrypted via Token-2022 Confidential Balances. Auditor-key holders configured by each DAO can selectively disclose specific records.",
+      "Treasury balances and transfers are not encrypted on devnet today: the treasury is a regular Token-2022 account and its balance is public on chain. Solvency proofs publish a threshold and a commitment, not the amount. Token-2022 Confidential Balances are planned. Auditor-key holders configured by each DAO can read records disclosed to them.",
     ],
   },
   {

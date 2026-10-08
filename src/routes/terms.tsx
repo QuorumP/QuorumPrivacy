@@ -58,7 +58,7 @@ const SECTIONS: { h: string; p: string[] }[] = [
   {
     h: "7. Confidential Treasury",
     p: [
-      "Confidential treasury balances and transfers use Token-2022 Confidential Balances. Selective disclosure to auditors is governed by auditor keys held by the DAO. QUORUM has no access to plaintext treasury data.",
+      "On devnet the treasury is a regular Token-2022 account; its balance and transfers are public on chain. Token-2022 Confidential Balances are planned. Selective disclosure of records to auditors is governed by auditor keys held by the DAO.",
     ],
   },
   {

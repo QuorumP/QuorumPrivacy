@@ -20,6 +20,7 @@ const adminOnly: [string, Fn, unknown][] = [
   ["recordSolvencyProof", A.recordSolvencyProof, { threshold: "1" }],
   ["addAuditor", A.addAuditor, { label: "a" }],
   ["revokeAuditor", A.revokeAuditor, { pubkey: "p" }],
+  ["setPause", A.setPause, { faucet: false }],
 ];
 // Fns any signed-in wallet may call, but never anonymously.
 const signedIn: [string, Fn, unknown][] = [
@@ -174,5 +175,53 @@ describe("tally node applications", () => {
     const { nodeId } = await A.applyTallyNode();
     const [n] = await sql<{ status: string; operator_wallet: string }>(`select status::text, operator_wallet from tally_nodes where node_id=$1`, [nodeId]);
     expect(n).toEqual({ status: "pending", operator_wallet: w });
+  });
+});
+
+describe("admin audit trail", () => {
+  const events = () => sql<{ id: number; actor: string; action: string; old_value: unknown; new_value: unknown }>(
+    `select id, actor, action, old_value, new_value from admin_events order by id`);
+
+  it("every admin action appends exactly one event: who, what, old → new", async () => {
+    signIn(ADMIN);
+    chain.treasury = 10n ** 15n;
+    const aud = await A.addAuditor({ data: { label: "Trail" } });
+    expect((await events()).at(-1)).toMatchObject({ actor: ADMIN, action: "addAuditor", new_value: { pubkey: aud.pubkey } });
+    const calls: [string, () => Promise<unknown>][] = [
+      ["createVote", () => A.createVote({ data: { title: "audit trail", days: 1 } })],
+      ["setPause", () => A.setPause({ data: { tally: true } })],
+      ["saveSettings", () => A.saveSettings({ data: { quorumPct: 7, approvalPct: 61, votingWindowDays: 4 } })],
+      ["setRealms", () => A.setRealms({ data: { enabled: false } })],
+      ["issueDisclosure", () => A.issueDisclosure({ data: { recordId: "R-trail", auditorPubkey: aud.pubkey, content: "secret memo 77" } })],
+      ["recordSolvencyProof", () => A.recordSolvencyProof({ data: { threshold: "1" } })],
+      ["revokeAuditor", () => A.revokeAuditor({ data: { pubkey: aud.pubkey } })],
+      ["setPause", () => A.setPause({ data: { tally: false } })],
+    ];
+    for (const [action, call] of calls) {
+      const before = (await events()).length;
+      await call();
+      const after = await events();
+      expect(after.length, action).toBe(before + 1);
+      expect(after.at(-1), action).toMatchObject({ actor: ADMIN, action });
+    }
+    const all = await events();
+    const pauseOn = all.filter((e) => e.action === "setPause").at(-2)!;
+    expect(pauseOn).toMatchObject({ old_value: { tally_paused: false }, new_value: { tally_paused: true } });
+    expect(all.filter((e) => e.action === "saveSettings").at(-1)!.new_value).toMatchObject({ quorumPct: 7, votingWindowDays: 4 });
+    expect(all.filter((e) => e.action === "revokeAuditor").at(-1)).toMatchObject({ old_value: { revoked: false }, new_value: { revoked: true } });
+    expect(JSON.stringify(all)).not.toContain("secret memo 77"); // disclosed content is never logged
+    // a failed admin call leaves no event behind
+    const n = all.length;
+    expect(await outcome(A.recordSolvencyProof({ data: { threshold: "99999999999" } }))).toBe("THRESHOLD_TOO_LARGE");
+    expect((await events()).length).toBe(n);
+  });
+
+  it("is append-only, even for the server role", async () => {
+    signIn(ADMIN);
+    await A.setRealms({ data: { enabled: true } });
+    await expect(sql(`update admin_events set actor='someone-else'`)).rejects.toThrow(/append-only/);
+    await expect(sql(`delete from admin_events`)).rejects.toThrow(/append-only/);
+    await expect(sql(`truncate admin_events`)).rejects.toThrow(/append-only/);
+    expect((await events()).every((e) => e.actor === ADMIN)).toBe(true);
   });
 });

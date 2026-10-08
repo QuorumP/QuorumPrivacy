@@ -2,8 +2,8 @@
 // The real confirmStake / unstakeQrm handlers run against Postgres (PGlite, real migrations) and a
 // fake devnet whose vault balance is tracked independently of the DB ledger.
 import { describe, it, expect, beforeEach } from "vitest";
-import { confirmStake, unstakeQrm, qrmFaucet } from "./actions";
-import { chain, signIn, signOut, newWallet, ledgerTotal, outcome, sql } from "../test/harness";
+import { confirmStake, unstakeQrm, qrmFaucet, setPause, runTally } from "./actions";
+import { chain, signIn, signOut, newWallet, ledgerTotal, outcome, sql, ADMIN } from "../test/harness";
 
 const stake = (w: string, amount: number) => {
   const sig = chain.userStake(w, amount);
@@ -138,6 +138,38 @@ describe("qrmFaucet", () => {
       signIn(newWallet());
       expect(await outcome(qrmFaucet())).toBe("FAUCET_DISABLED");
     } finally { process.env.SOLANA_RPC = rpc; }
+  });
+});
+
+describe("pause switches", () => {
+  const pause = async (p: { faucet?: boolean; tally?: boolean }) => { signIn(ADMIN); await setPause({ data: p }); };
+
+  it("stop the faucet and the tally, never unstaking (exit stays open)", async () => {
+    const w = newWallet();
+    await stake(w, 200);
+    await pause({ faucet: true, tally: true });
+    try {
+      signIn(w);
+      expect(await outcome(qrmFaucet())).toBe("PAUSED");
+      expect(await outcome(runTally({ data: { voteId: "qrm-none" } }))).toBe("PAUSED");
+      await expect(unstake(w, 200)).resolves.toMatchObject({ staked: 0 });
+      expect(chain.vault).toBe(0);
+    } finally { await pause({ faucet: false, tally: false }); }
+    signIn(w);
+    expect(await outcome(qrmFaucet())).toBe("ok");
+    expect(await outcome(runTally({ data: { voteId: "qrm-none" } }))).not.toBe("PAUSED");
+  });
+
+  it("are independent and admin-only", async () => {
+    await pause({ faucet: true });
+    try {
+      signIn(newWallet());
+      expect(await outcome(qrmFaucet())).toBe("PAUSED");
+      expect(await outcome(runTally({ data: { voteId: "qrm-none" } }))).not.toBe("PAUSED");
+      expect(await outcome(setPause({ data: { faucet: false } }))).toBe("FORBIDDEN");
+      signOut();
+      expect(await outcome(setPause({ data: { faucet: false } }))).toBe("UNAUTHENTICATED");
+    } finally { await pause({ faucet: false }); }
   });
 });
 

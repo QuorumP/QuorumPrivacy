@@ -25,10 +25,34 @@ Every privileged power today, and who holds it.
 | Treasury (solvency proofs are made over it) | Same key, as token owner | Dedicated account `8EgMeBoKGRdk34YfpCUuW9xwXtgg6wbmfr6hx4sVDvGt`. The server reads its balance and generates each proof; `verify_solvency` only accepts this key. |
 | Faucet (devnet only) | Same key, from its own token account | 500 QRM per drip, 3 per wallet per hour, 200 per day globally. |
 | Anchor votes and tallies on-chain | Same key | `register_vote` only accepts this key; `commit_ballots`, `submit_tally`, `close_vote` require the vote's registering key. |
-| Create votes, change settings, manage auditors and disclosures, publish solvency proofs | Wallets in `ADMIN_WALLETS` (two operator wallets) | Enforced server-side (`requireAdmin`). |
+| Create votes, change settings, manage auditors and disclosures, publish solvency proofs | Wallets in `ADMIN_WALLETS` (two operator wallets) | Enforced server-side (`requireAdmin`). Every admin action appends a row to `admin_events` (who, action, old → new), which is append-only even for the server role. |
+| Pause the faucet and/or the tally | Wallets in `ADMIN_WALLETS` | `setPause`, dashboard Settings → Incident switches. Logged and posted to the alert webhook. Unstaking cannot be paused. |
 | Decrypt tally totals | Operator's server | 3-of-5 threshold key, but all shares are held by one server today (see accepted risks). |
 | Tally a vote | The vote's creator after it closes; wallets in `ADMIN_WALLETS` at any time | Enforced in `runTally`. |
 | Database | Operator (Supabase `postgres` role used by the server, over CA-verified TLS) | Public tables are read-only to anonymous clients; members, ballots and ledgers deny anonymous access. |
+
+## Incident response
+
+**Monitoring.** `.github/workflows/monitor.yml` runs `scripts/onchain/monitor.mjs` every hour (read-only). It
+fails, and GitHub notifies the repo owner, when: the post-deploy check fails (program hash, upgrade authority,
+any QRM mint/freeze/fee/metadata authority, or the vault/treasury accounts changed); the authority's SOL drops
+below 1 SOL; a single stake-vault outflow exceeds 10,000 QRM or outflows exceed 50,000 QRM in an hour; or the
+treasury sends anything at all. If the `ALERT_WEBHOOK_URL` secret is set, alerts are also posted there, and
+the server posts every pause switch to the same webhook (`ALERT_WEBHOOK_URL` in the app's environment).
+
+**Pausing.** Wallets in `ADMIN_WALLETS` can pause the faucet and the tally from the dashboard (Settings →
+Incident switches) or with `setPause`. Both return `PAUSED` while switched off. Unstaking has no switch by
+design: members can always withdraw their stake, including during an incident.
+
+| Alert | First action | Then |
+| :-- | :-- | :-- |
+| Post-deploy check failed | Pause faucet and tally. Run `node scripts/onchain/post-deploy-check.mjs` to see which check failed. | If the program hash or an authority changed without a planned deploy, treat the authority key as compromised: if it still signs for us, move the upgrade and mint authorities to a fresh key (`solana program set-upgrade-authority`, `spl-token authorize`), rotate `ANCHOR_AUTHORITY_SECRET` in Vercel, and post a notice. |
+| Large stake-vault outflow | Compare the transaction with `stake_txs` / `stakes`: a legitimate unstake has a matching ledger debit. | If there is no matching debit, pause the faucet and the tally and follow the key-compromise steps above. Unstaking stays open. |
+| Any treasury outflow | No app code moves treasury funds: treat it as a key compromise. | Same as above; record the new balance before the next solvency proof. |
+| Authority SOL low | Top up the authority from the devnet faucet. | Check `admin_events` and recent transactions for unusual fee spend. |
+
+**Contacts.** Vulnerabilities: the private GitHub advisory above. Operator: GitHub `@QuorumP`. Once real value
+is at stake (after the mainnet checklist), active exploits also go to SEAL 911 (https://t.me/seal_911_bot).
 
 ## Mainnet handoff plan
 
@@ -80,6 +104,8 @@ others, and fails if any of them goes undetected.
 | Public read endpoints expose no ballot, identity, sealed proposal, disclosure or delegation data | `src/fn/data.test.ts` |
 | A sign-in signature works once, only for its wallet and our domain | `src/fn/auth.test.ts` |
 | A solvency proof covers the treasury account's real balance: a threshold above it, or a field-"negative" balance or threshold, can't be proven; only active auditors can open it; on chain only the authority may attest | `src/fn/admin.test.ts` "solvency proofs…", `scripts/zk/solvency-test.mjs`, `tests.rs` `verify_solvency_instruction` |
+| Every admin action leaves exactly one append-only audit event; failed actions leave none; the disclosed content is never logged | `src/fn/admin.test.ts` "admin audit trail" |
+| Pausing stops the faucet and the tally but never unstaking | `src/fn/stake.test.ts` "pause switches" |
 | On-chain: only the vote's authority advances it, states move strictly open → tallying → verified, and verifier inputs must be canonical | `onchain/programs/quorum_anchor/src/tests.rs`, `groth16.rs`, `scripts/onchain/anchor-vote.mjs` (devnet) |
 
 ## Audit history

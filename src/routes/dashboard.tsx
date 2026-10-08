@@ -38,7 +38,7 @@ import {
   castBallot, submitProposal, createVote, qrmFaucet, confirmStake, unstakeQrm, saveSettings,
   issueDisclosure, recordSolvencyProof, addAuditor, revokeAuditor,
   applyTallyNode, verifyProof, verifyTally, runTally, revealProposal,
-  setRealms as setRealmsFn, setDelegation, clearDelegation,
+  setRealms as setRealmsFn, setDelegation, clearDelegation, setPause,
 } from "@/fn/actions";
 import { registerIdentity, getEligibility } from "@/fn/zk";
 
@@ -1749,7 +1749,7 @@ function DocsTab() {
   const docs: { t: string; d: string; Icon: typeof Vote }[] = [
     { t: "Sealed-Ballot Voting", d: "Threshold encryption client-side; totals-only decryption with public DLEQ correctness proofs; result hash anchored on-chain.", Icon: Vote },
     { t: "Hidden-Until-Execution Proposals", d: "Encrypted payloads with public rules; reveal on-pass or timelock; eliminates the front-run window.", Icon: FileLock2 },
-    { t: "Confidential Treasury", d: "Token-2022 Confidential Balances + auditor key for selective disclosure and solvency proofs.", Icon: Landmark },
+    { t: "Confidential Treasury", d: "Solvency proofs over the real treasury account + auditor keys for selective disclosure. Confidential balances planned.", Icon: Landmark },
     { t: "Private Delegation + ZK Eligibility", d: "Prove voting weight without revealing balance. Nullifier prevents double-voting.", Icon: KeyRound },
     { t: "QRM Token-2022", d: "Transfer hook, fee, confidential transfer, interest-bearing for staked nodes.", Icon: Coins },
     { t: "Realms Integration", d: "QUORUM composes with Realms — adds confidential voting + treasury without replacing tooling.", Icon: Network },
@@ -1923,6 +1923,7 @@ function SettingsTab() {
   const [approval, setApproval] = useState(String(settings?.approval_pct ?? 60));
   const [windowDays, setWindowDays] = useState(String(settings?.voting_window_days ?? 3));
   const [realms, setRealms] = useState(settings?.realms_enabled ?? true);
+  const [paused, setPaused] = useState({ faucet: settings?.faucet_paused ?? false, tally: settings?.tally_paused ?? false });
 
   const authError = (e: unknown) =>
     toast.error((e as Error).message === "UNAUTHENTICATED" ? "Connect & sign in first." : (e as Error).message === "FORBIDDEN" ? "Admins only." : "Action failed.");
@@ -2009,6 +2010,31 @@ function SettingsTab() {
               <button style={btnStyle({ sm: true })} onClick={() => revoke(a.pubkey)}>Revoke</button>
             </div>
           ))}
+        </div>
+      </Panel>
+
+      <Panel title="Incident switches" subtitle="Admins only · every change is logged">
+        <div style={{ display: "grid", gap: "0.75rem" }}>
+          {([["faucet", "Faucet", "Stops new QRM drips."], ["tally", "Tally", "Stops new tallies from running."]] as const).map(([key, name, desc]) => (
+            <div key={key} style={{ ...cardStyle, padding: "1rem 1.25rem", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.85rem" }}>
+              <div>
+                <div style={{ fontSize: "0.95rem" }}>{name}</div>
+                <div style={{ fontSize: "0.8rem", opacity: 0.7, marginTop: "0.25rem" }}>{desc}</div>
+              </div>
+              <button onClick={async () => {
+                const next = !paused[key];
+                try {
+                  const res = await setPause({ data: { [key]: next } });
+                  setPaused({ faucet: res.faucet_paused, tally: res.tally_paused });
+                  await router.invalidate();
+                  toast.success(`${name} ${next ? "paused" : "resumed"}`);
+                } catch (e) { authError(e); }
+              }} style={btnStyle({ filled: paused[key], sm: true })}>
+                {paused[key] ? "Paused" : "Running"}
+              </button>
+            </div>
+          ))}
+          <div style={{ fontSize: "0.8rem", opacity: 0.7 }}>Unstaking has no pause switch: members can always take their stake back.</div>
         </div>
       </Panel>
 

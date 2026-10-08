@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-10-08 — Admin audit trail, pause switches, monitoring
+
+- Every admin action (votes, settings, auditors, disclosures, solvency proofs, pause) appends a row to
+  `admin_events`: who, what, old → new. The table is append-only, even for the server role.
+- Admins can pause the faucet and the tally (dashboard Settings → Incident switches). Unstaking cannot be
+  paused: members can always take their stake back.
+- Hourly monitor (`.github/workflows/monitor.yml`): program hash, authorities, authority SOL, large vault
+  outflows, any treasury outflow. SECURITY.md has the incident runbook and contacts.
+- Removed copy that claimed Token-2022 Confidential Balances (privacy policy, terms, landing page).
+- The seed script no longer inserts illustrative votes, tally nodes, proofs or auditor keys.
+
 ## 2026-10-08 — Verifiable program build
 
 - The live `quorum_anchor` program is now the `solana-verify build` of this source (pinned Docker image).
