@@ -55,16 +55,20 @@ jobs:
       - run: cargo install cargo-audit --locked --version 0.22.1 && cargo audit
 
   # Sec3 X-ray static analysis (owner/signer checks, type confusion, PDA, arbitrary CPI).
-  # It can exit 0 even with findings, so the job fails unless the summary is clean.
+  # It can exit 0 even with findings, so the job fails unless the first line after the summary
+  # header is exactly "No issues detected" (shell: bash adds pipefail, so a docker failure fails too).
   xray:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - run: |
+      - shell: bash
+        run: |
           docker run --rm -v "$PWD:/workspace" ghcr.io/sec3-product/x-ray@sha256:543dc6a984d4abf8792d00884b9225b2ad28cdd06320d7a8ba3855a46a491997 /workspace/onchain/programs/quorum_anchor | tee xray.log   # v0.0.6
-          grep -q "No issues detected" xray.log
+          awk '/summary of potential vulnerabilities/ { s = 1; next }
+               s && NF { gsub(/^[ \t]+|[ \t]+$/, ""); ok = ($0 == "No issues detected"); s = 0; n++ }
+               END { exit !(n == 1 && ok) }' xray.log
 
   circuits:
     runs-on: ubuntu-latest
