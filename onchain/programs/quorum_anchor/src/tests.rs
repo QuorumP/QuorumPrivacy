@@ -145,3 +145,20 @@ fn verify_solvency_instruction() {
     // a valid proof from any other signer is refused: only the server attests real balances
     assert_eq!(run(vec![signer(Pubkey::new_unique(), true)], ix(tv::PUB0)), Err(UNAUTHORIZED));
 }
+
+#[test]
+fn space_fits_the_largest_vote_exactly() {
+    // too small and register_vote fails for a max-length id; too large wastes rent
+    let v = VoteAnchor {
+        authority: Pubkey::new_unique(),
+        vote_id: "x".repeat(MAX_ID),
+        eligibility_root: [1; 32],
+        ballot_root: [2; 32],
+        result_hash: [3; 32],
+        status: STATUS_VERIFIED,
+        bump: 255,
+    };
+    let mut data = Vec::new();
+    v.try_serialize(&mut data).unwrap();
+    assert_eq!(data.len(), VoteAnchor::SPACE);
+}

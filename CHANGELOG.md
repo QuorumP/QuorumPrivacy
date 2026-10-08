@@ -1,6 +1,6 @@
 # Changelog
 
-## 2026-10-08 — Admin audit trail, pause switches, monitoring
+## 2026-10-08 — Admin audit trail, pause switches, monitoring, program mutation testing
 
 - Every admin action (votes, settings, auditors, disclosures, solvency proofs, pause) appends a row to
   `admin_events`: who, what, old → new. The table is append-only, even for the server role.
@@ -10,6 +10,8 @@
   outflows, any treasury outflow. SECURITY.md has the incident runbook and contacts.
 - Removed copy that claimed Token-2022 Confidential Balances (privacy policy, terms, landing page).
 - The seed script no longer inserts illustrative votes, tally nodes, proofs or auditor keys.
+- cargo-mutants on the Anchor program in CI: 27/28 viable mutants caught. A new test pins the vote
+  account size to the largest serialized vote.
 
 ## 2026-10-08 — Verifiable program build
 

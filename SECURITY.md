@@ -90,7 +90,10 @@ Server functions are tested end to end against Postgres (PGlite running the real
 a fake devnet that tracks the stake vault separately from the database ledger. CI runs every
 suite on each push, fails if line coverage of the server, crypto and ZK code drops below 85%,
 and runs a mutation sample (`scripts/test/mutants.mjs`). That sample plants each bug below, plus
-others, and fails if any of them goes undetected.
+others, and fails if any of them goes undetected. The on-chain program also gets systematic mutation
+testing with cargo-mutants (CI job `program-mutants`, config `onchain/.cargo/mutants.toml`): 27 of 28
+viable mutants are caught (96%); the one skipped is `register_vote`'s body, whose `init` CPI can only run
+on devnet (`scripts/onchain/anchor-vote.mjs`). The job fails if any other mutant survives.
 
 | Invariant | Test |
 | :-- | :-- |

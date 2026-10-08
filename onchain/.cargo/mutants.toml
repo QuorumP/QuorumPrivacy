@@ -1,0 +1,5 @@
+# cargo-mutants config (CI job "program-mutants"). Generated constants and the tests themselves are
+# not mutated. register_vote's body is skipped: its `init` CPI can't run natively, so it is tested on
+# devnet instead (scripts/onchain/anchor-vote.mjs). Counted as missed, the score is 27/28 (96%).
+exclude_globs = ["**/tests.rs", "**/test_vector.rs", "**/groth16_vk.rs"]
+exclude_re = ['replace quorum_anchor::register_vote ->']

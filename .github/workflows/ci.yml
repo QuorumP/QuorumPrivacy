@@ -54,6 +54,21 @@ jobs:
       - run: cargo clippy --locked --all-targets
       - run: cargo install cargo-audit --locked --version 0.22.1 && cargo audit
 
+  # Systematic mutation testing of the on-chain program (cargo-mutants; config in
+  # onchain/.cargo/mutants.toml). Fails if any viable mutant survives.
+  program-mutants:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: onchain
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install
+      - run: cargo install cargo-mutants --locked --version 27.1.0
+      - run: cargo mutants --no-shuffle
+
   # Build of record: solana-verify's Docker build (pinned image), so anyone can reproduce the hash.
   # Fails unless that hash equals onchain/BUILD_HASH (the deployed build) and what is live on devnet:
   # "live code = this commit's code". After a program change it stays red until the artifact below
