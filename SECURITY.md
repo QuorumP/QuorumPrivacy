@@ -67,7 +67,7 @@ others, and fails if any of them goes undetected.
 
 | Invariant | Test |
 | :-- | :-- |
-| The vault's on-chain balance always equals the sum of the stake ledger, and no wallet's stake goes negative, under random concurrent stakes, unstakes and every payout failure mode | `src/fn/stake.test.ts` "stake ledger invariants" |
+| The vault's on-chain balance always equals the sum of the stake ledger, and no wallet's stake goes negative, under random concurrent stakes, unstakes and every payout failure mode | `src/fn/stake.test.ts` "stake ledger invariants" (450 ops per push; ~105k nightly via `.github/workflows/nightly.yml`) |
 | Concurrent unstakes never pay out more than the stake | `stake.test.ts` "concurrent unstakes…" |
 | A stake transaction is credited once, only to the wallet that signed it, for the vault's actual balance change | `stake.test.ts`, `src/lib/solana/qrm.test.ts` |
 | One ballot per member per vote: nullifiers are canonical, identities are write-once, proofs are bound to the vote's frozen eligibility snapshot | `src/fn/voting.test.ts` |

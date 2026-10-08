@@ -157,8 +157,11 @@ function prng(seed: number) { // mulberry32: reproducible runs, the seed is in t
   };
 }
 
+// STAKE_OPS=35000 is the nightly long run (3 seeds × 35k ≈ 105k operations); the default keeps PR CI fast.
+const OPS = Number(process.env.STAKE_OPS ?? 150);
+
 describe.each([1, 2, 3])("stake ledger invariants (seed %i)", (seed) => {
-  it("hold across 150 random operations", async () => {
+  it(`hold across ${OPS} random operations`, async () => {
     const rand = prng(seed);
     const pick = <T,>(xs: T[]) => xs[Math.floor(rand() * xs.length)];
     const START = 10_000;
@@ -178,7 +181,7 @@ describe.each([1, 2, 3])("stake ledger invariants (seed %i)", (seed) => {
       expect(neg.n, `I4 ${where}`).toBe(0);
     };
 
-    for (let step = 0; step < 150; step++) {
+    for (let step = 0; step < OPS; step++) {
       await sql(`delete from rate_limits`); // limits are tested above; here they'd just mask ops
       const w = pick(wallets);
       const op = rand();
@@ -204,5 +207,5 @@ describe.each([1, 2, 3])("stake ledger invariants (seed %i)", (seed) => {
       }
       await check(step);
     }
-  });
+  }, Math.max(30_000, OPS * 100));
 });
