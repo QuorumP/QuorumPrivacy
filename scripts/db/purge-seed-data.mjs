@@ -1,3 +1,9 @@
+// One-off (2026-10-08): delete the illustrative rows the old seed script put in the live database —
+// votes qrm-001..003 (+ their fake tally result), proposals P-012..014, tally nodes N-08/12/17/21 and
+// tn-1..5, the matching proof-feed rows, T-1042, the unbound S-0f4a solvency record and the three
+// placeholder auditor keys. Everything runs in one transaction and only commits if every count
+// matches what was inspected. Dry run (default) rolls back: node scripts/db/purge-seed-data.mjs
+// Commit: node scripts/db/purge-seed-data.mjs commit
 import { readFileSync } from "node:fs";
 import pg from "pg";
 import { ssl } from "./ssl.mjs";
@@ -10,7 +16,7 @@ const c = new pg.Client({ host: process.env.PGHOST, port: Number(process.env.PGP
 await c.connect();
 const SEED_NODES = ["N-08", "N-12", "N-17", "N-21", "tn-1", "tn-2", "tn-3", "tn-4", "tn-5"];
 const steps = [
-  ["stakes pointing at seeded nodes (must be 0)", `select 1 from stakes where node_id in (select id from tally_nodes where node_id = any($1))`, [SEED_NODES], 0, "select"],
+  ["stakes pointing at seeded nodes (must be 0)", `select 1 from stakes where node_id = any($1)`, [SEED_NODES], 0, "select"],
   ["proofs", `delete from proofs where (kind,ref_id) in (('vote','qrm-003'),('tally','T-2041'),('node','N-08'),('treasury','S-0f4a'))`, [], 4],
   ["treasury_records", `delete from treasury_records where (record_id='T-1042' and commitment='commit:0x3a..7c11') or (record_id='S-0f4a' and account is null)`, [], 2],
   ["auditor_keys (placeholder pubkeys)", `delete from auditor_keys where length(pubkey)=10 and pubkey like '0x%..%'`, [], 3],
