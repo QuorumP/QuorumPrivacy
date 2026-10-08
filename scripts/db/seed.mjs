@@ -88,7 +88,6 @@ const run = async () => {
   const proofs = [
     ["vote", "qrm-003", "Treasury allocation Q3", "ZK Groth16 · Verified"],
     ["tally", "T-2041", "MPC cluster · 7/9 nodes", "Attestation OK"],
-    ["treasury", "S-117", "Solvency proof", "Valid"],
     ["node", "N-08", "Tally node — no slash events", "Honest"],
   ];
   await q(`delete from proofs`);
@@ -98,7 +97,6 @@ const run = async () => {
   }
 
   const treasury = [
-    ["S-117", "solvency", true, "treasury >= obligations"],
     ["T-1042", "transfer", false, null],
   ];
   for (const [rid, kind, disclosed, note] of treasury) {
